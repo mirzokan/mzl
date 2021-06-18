@@ -12,22 +12,50 @@ import psycopg2
 from configparser import ConfigParser
 
 
-# def config(filename='db.ini', section='postgresql'):
-#     parser = ConfigParser()
-#     parser.read(filename)
+def read_config(filename='db.ini', section='postgresql'):
+    '''
+    Reads an .ini configuration file meant to hold database connection configuration
 
-#     db = {}
-#     if parser.has_section(section):
-#         params = parser.items(section)
-#         for param in params:
-#             db[param[0]] = param[1]
-#     else:
-#         raise Exception(f'Section {section} not found in the {filename} file')
-#     return db
+    Arguments:
+    filename: String, path to the configuraiton file
+    section: String, name of the .ini file section to read
 
-# def dr(sql):
-#     global conn
-#     return psql.read_sql(sql, conn)
+    Returns:
+    A dictionary of configuration settings
+    '''
+    parser = ConfigParser()
+    parser.read(filename)
+
+    db = {}
+    if parser.has_section(section):
+        params = parser.items(section)
+        for param in params:
+            db[param[0]] = param[1]
+    else:
+        raise Exception(f'Section {section} not found in the {filename} file')
+    return db
+
+
+def db_reader(filename='db.ini', section='postgresql'):
+    '''
+    Creates a database connection object and a function to read SQL straight into a pandas DataFrame
+
+    Arguments:
+    filename: String, path to the configuraiton file
+    section: String, name of the .ini file section to read
+
+    Returns:
+    A tuple, first a database connection object, secornd, a function that takes a string 
+    SQL query and returns the database response as a pandas DataFrame
+    '''
+    db = read_config(filename=filename, section=section)
+    conn = psycopg2.connect(**db)
+
+    def dr(sql):
+        psql.read_sql(sql, conn)
+
+    return conn, dr
+
 
 def xview(df):
     '''
