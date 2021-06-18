@@ -2,7 +2,7 @@
 Tools for Pandas
 '''
 
-import re, sys, os, itertools
+import re, sys, os, itertools, tempfile, glob
 
 import numpy as np
 import pandas as pd
@@ -32,13 +32,22 @@ from configparser import ConfigParser
 def xview(df):
     '''
     Save a Pandas DataFrame as an temporary Excel file and open it, to be used as a lazy data viewer
+
+    Arguments:
+    df: Pandas Dataframe to view
     '''
-    current_path = os.getcwd()
-    filename = "view.xlsx"
+    
+    oldfiles = glob.glob(os.path.join(tempfile.gettempdir(), "mizosoup_xview_*"))
+
     try:
-        df.to_excel(filename)
+        for file in oldfiles:
+            os.remove(os.path.abspath(file))
     except:
-        filename = "view2.xlsx"
-        df.to_excel(filename)
-    full_path = os.path.join(current_path, filename)
-    os.system("start " + full_path)
+        pass
+    
+    tf = tempfile.NamedTemporaryFile(prefix="mizosoup_xview_", suffix=".xlsx", delete=False)
+    df.to_excel(tf)
+    path = os.path.abspath(tf.name) 
+    com = r"start {}".format(path)
+    tf.close()
+    os.system(com)
