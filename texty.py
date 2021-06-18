@@ -13,27 +13,27 @@ from nltk.corpus import words
 
 
 def parse_replace(input_string, start_delim="(", end_delim=")", replacement="", level=1, start_alt=None, end_alt=None, strict_eos=False):
-'''
-Parse a string using a set of delimiters and replace said delimiters with something else only
-at a specified level of nesting. Useful when processing semi-structured strings.
+    '''
+    Parse a string using a set of delimiters and replace said delimiters with something else only
+    at a specified level of nesting. Useful when processing semi-structured strings.
 
-Arguments:
-input_string: String containing the nested delimiters to process
-start_delim: String specifying the start delimiter, defaults to "(" 
-end_delim: String specifying the end delimiter, defaults to ")"
-replacement: String that replaces both delimiters, defaults to ""
-level: Integer specifying the level of nesting at which replacements occur, defaults to 1
-start_alt: String specifying an alternative version of the start delimiter that will trigger a level change
-        but will not be replaced, must be shorter than the start delimiter
-end_alt: String specifying an alternative version of the end delimiter that will trigger a level change
-        but will not be replaced, must be shorter than the end delimiter
-strict_eos: Boolean, if false will allow replacement of delimiter set that contains the 
-            alternative end delimiter, but only when it is located at the end of the string or followed
-            only by the replacement string
+    Arguments:
+    input_string: String containing the nested delimiters to process
+    start_delim: String specifying the start delimiter, defaults to "(" 
+    end_delim: String specifying the end delimiter, defaults to ")"
+    replacement: String that replaces both delimiters, defaults to ""
+    level: Integer specifying the level of nesting at which replacements occur, defaults to 1
+    start_alt: String specifying an alternative version of the start delimiter that will trigger a level change
+            but will not be replaced, must be shorter than the start delimiter
+    end_alt: String specifying an alternative version of the end delimiter that will trigger a level change
+            but will not be replaced, must be shorter than the end delimiter
+    strict_eos: Boolean, if false will allow replacement of delimiter set that contains the 
+                alternative end delimiter, but only when it is located at the end of the string or followed
+                only by the replacement string
 
-Returns:
-String where the delimiters are replaced with the replacement
-'''
+    Returns:
+    String where the delimiters are replaced with the replacement
+    '''
     
     if start_delim == end_delim:
         raise Exception("Delimeters must be different.")

@@ -5,13 +5,13 @@ General Purpose Tools
 import os, sys
 
 def sdir(obj, sunder=False):
-'''
-Special dir function
-Modification of the dir function to detail special and object specific callables and attributes
-Arguments: 
-* obj: Object, any object to instpect
-* sunder: Boolean, False shows non-undered attributes, True includes single-under attributes
-'''
+	'''
+	Special dir function
+	Modification of the dir function to detail special and object specific callables and attributes
+	Arguments: 
+	* obj: Object, any object to instpect
+	* sunder: Boolean, False shows non-undered attributes, True includes single-under attributes
+	'''
 	print(type(obj))
 	if sunder:
 		unders = [x for x in dir(obj) if re.match("^_(?!_)", x)]
