@@ -52,7 +52,7 @@ def db_reader(filename='db.ini', section='postgresql'):
     conn = psycopg2.connect(**db)
 
     def dr(sql):
-        psql.read_sql(sql, conn)
+        return psql.read_sql(sql, conn)
 
     return conn, dr
 
