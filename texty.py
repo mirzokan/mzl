@@ -2,7 +2,10 @@
 Tools for working with text data
 '''
 
-import re, sys, os, itertools
+import re
+import sys
+import os
+import itertools
 
 import numpy as np
 import pandas as pd
@@ -11,25 +14,32 @@ from matplotlib import pyplot as plt
 from nltk.corpus import words
 
 
-
-def parse_replace(input_string, start_delim="(", end_delim=")", replacement="", level=1, start_alt=None, end_alt=None, strict_eos=False):
+def parse_replace(input_string, start_delim="(", end_delim=")",
+                  replacement="", level=1, start_alt=None, end_alt=None,
+                  strict_eos=False):
     '''
-    Parse a string using a set of delimiters and replace said delimiters with something else only
-    at a specified level of nesting. Useful when processing semi-structured strings.
+    Parse a string using a set of delimiters and replace said delimiters
+    with something else only at a specified level of nesting. Useful 
+    when processing semi-structured strings.
 
     Arguments:
-    input_string: String containing the nested delimiters to process
-    start_delim: String specifying the start delimiter, defaults to "(" 
-    end_delim: String specifying the end delimiter, defaults to ")"
-    replacement: String that replaces both delimiters, defaults to ""
-    level: Integer specifying the level of nesting at which replacements occur, defaults to 1
-    start_alt: String specifying an alternative version of the start delimiter that will trigger a level change
-            but will not be replaced, must be shorter than the start delimiter
-    end_alt: String specifying an alternative version of the end delimiter that will trigger a level change
-            but will not be replaced, must be shorter than the end delimiter
-    strict_eos: Boolean, if false will allow replacement of delimiter set that contains the 
-                alternative end delimiter, but only when it is located at the end of the string or followed
-                only by the replacement string
+    - input_string: String containing the nested delimiters to process
+    - start_delim: String specifying the start delimiter, defaults to "(" 
+    - end_delim: String specifying the end delimiter, defaults to ")"
+    - replacement: String that replaces both delimiters, defaults to ""
+    - level: Integer specifying the level of nesting at which replacements
+             occur, defaults to 1
+    - start_alt: String specifying an alternative version of the start
+                 delimiter that will trigger a level change
+                 but will not be replaced, must be shorter than the
+                 start delimiter
+    - end_alt: String specifying an alternative version of the end 
+               delimiter that will trigger a level change but will not
+               be replaced, must be shorter than the end delimiter
+    - strict_eos: Boolean, if false will allow replacement of delimiter
+                  set that contains the alternative end delimiter, but
+                  only when it is located at the end of the string or
+                  followed only by the replacement string
 
     Returns:
     String where the delimiters are replaced with the replacement
@@ -39,7 +49,7 @@ def parse_replace(input_string, start_delim="(", end_delim=")", replacement="", 
         raise Exception("Delimeters must be different.")
        
     if (start_alt is not None and len(start_alt) > len(start_delim)) or \
-        (end_alt is not None and len(end_alt) > len(end_delim)): 
+       (end_alt is not None and len(end_alt) > len(end_delim)): 
         raise Exception("Alternative delimiter must not be longer than the delimiter.")
         
     if start_delim not in input_string:
@@ -55,7 +65,7 @@ def parse_replace(input_string, start_delim="(", end_delim=")", replacement="", 
 
     i = 0
     while i <= len(input_string):
-#         print(f"{i}. {current_level}|{input_string[i:i+len(start_delim)]}|{input_string[i:i+len(start_alt)]}")
+    #print(f"{i}. {current_level}|{input_string[i:i+len(start_delim)]}|{input_string[i:i+len(start_alt)]}")
 
         start_del_hit = input_string[i:i+len(start_delim)] == start_delim
         start_alt_hit = input_string[i:i+len(start_alt)] == start_alt
@@ -83,7 +93,6 @@ def parse_replace(input_string, start_delim="(", end_delim=")", replacement="", 
                 current_level = 0
                 chunk_start = None
                 
-        
         if end_del_hit or eos_alt_hit:
             current_level -= 1
             if current_level < 0 and chunk_start is not None:
@@ -108,4 +117,3 @@ def parse_replace(input_string, start_delim="(", end_delim=")", replacement="", 
                         output_string[adjusted_start + len(start_delim):adjusted_end] + \
                         replacement + output_string[adjusted_end + len(end_delim):]
     return output_string
-
