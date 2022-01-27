@@ -60,7 +60,7 @@ def db_reader(filename='db.ini', section='postgresql'):
     return conn, dr
 
 
-def xview(df):
+def xview(df, index=True):
     '''
     Save a Pandas DataFrame as an temporary Excel file and open it, to 
     be used as a lazy data viewer
@@ -80,7 +80,7 @@ def xview(df):
     
     tf = tempfile.NamedTemporaryFile(prefix="mizosoup_xview_",
                                      suffix=".xlsx", delete=False)
-    df.to_excel(tf)
+    df.to_excel(tf, index=index)
     path = os.path.abspath(tf.name) 
     com = r"start {}".format(path)
     tf.close()
