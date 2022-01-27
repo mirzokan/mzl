@@ -38,31 +38,14 @@ def sdir(obj, sunder=False):
     print(attribs)
 
 
-# Needs Cleanup.
-# def ftpUpload(ftpServer, ftpUser, ftpPass, ftpRemote, payload_path):
-#     '''
-#     Arguments:
-#     * ftpServer: string, address of the ftp server, e.g. ftp.mirzo.net
-#     * ftpUser: string, username
-#     * ftpPass: string, password
-#     * ftpRemote: string, remote starting path
-#     * payload_path: filepath to upload file
-#     '''
-#     import ftplib
-
-#     try:
-#         ftp = ftplib.FTP(ftpServer)
-#         ftp.login(ftpUser, ftpPass)
-#         ftpUpload(ftp, ftpRemote, payload_path)
-#     except:
-#         status = "Upload Failed"
-#     finally:
-#         ftp.quit()
-
-#     ext = os.path.splitext(file)[1]
-#     filename = os.path.basename(file)
-#     # if ext in (".txt", ".htm", ".html"):
-#     #     ftp.storlines("STOR " + filename, open(file))
-#     # else:
-#     #     ftp.storbinary("STOR " + filename, open(file, "rb"), 1024)
-#     ftp.storbinary("STOR " + filename, open(file, "rb"), 1024)
+def subl(a, b):
+    """Subtract list b from list a.
+    
+    Args:
+        a (list): List from which to subtract
+        b (list): List which to subtract
+    
+    Returns:
+        list: List that results from the subtraction
+    """
+    return [x for x in a if x not in b]
