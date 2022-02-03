@@ -3,6 +3,7 @@ General Purpose Tools
 '''
 
 import re
+import os
 
 
 def sdir(obj, sunder=False):
@@ -50,3 +51,16 @@ def subl(a, b):
         list: List that results from the subtraction
     """
     return [x for x in a if x not in b]
+
+
+def get_latest_file(path, pattern=None):
+    files = next(os.walk(path))[2]
+    if pattern is not None:
+        files = [file for file in files 
+                 if re.fullmatch(pattern, file) is not None]
+    files.sort(reverse=True)
+    if len(files) >= 1:
+        latest_file = os.path.join(path, files[0])
+    else:
+        raise FileNotFoundError
+    return latest_file
