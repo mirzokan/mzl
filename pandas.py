@@ -70,7 +70,7 @@ def xview(df, index=True):
     '''
     
     oldfiles = glob.glob(os.path.join(tempfile.gettempdir(),
-                                      "mizosoup_xview_*"))
+                                      "mzl_xview_*"))
 
     try:
         for file in oldfiles:
@@ -78,7 +78,7 @@ def xview(df, index=True):
     except:
         pass
     
-    tf = tempfile.NamedTemporaryFile(prefix="mizosoup_xview_",
+    tf = tempfile.NamedTemporaryFile(prefix="mzl_xview_",
                                      suffix=".xlsx", delete=False)
     df.to_excel(tf, index=index)
     path = os.path.abspath(tf.name) 
