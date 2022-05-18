@@ -120,13 +120,22 @@ def list_files_by_ext(path, ext, excluded_subfolder_terms=None):
 
 
 def copy_files(file_list, destination_path, message=False):
+    """Copies a list of paths to a destination directory.
+    Does not overwrite existing files.
+    
+    Args:
+        file_list (list): List of paths to copy
+        destination_path (str): Destination path
+        message (str or bool, optional): Whether results are printed,
+                set to "all" to print previously existing files.
+    """
     for i, file_path in enumerate(file_list):
         file_name = os.path.basename(file_path)
         new_path = os.path.join(destination_path, file_name)
         if os.path.isfile(new_path):
-            if message:
+            if message == "all":
                 print(f"{i}. Exists: {os.path.basename(file_name)}")
         else:
             shutil.copy(file_path, new_path)
-            if message:
+            if message is not False:
                 print(f"{i}. Copied: {os.path.basename(file_name)}")

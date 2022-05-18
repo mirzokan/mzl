@@ -10,6 +10,7 @@ import pandas.io.sql as psql
 
 import psycopg2
 from configparser import ConfigParser
+from .gen import subl
 
 
 def read_config(filename='db.ini', section='postgresql'):
@@ -85,3 +86,16 @@ def xview(df, index=True):
     com = r"start {}".format(path)
     tf.close()
     os.system(com)
+
+
+def push_cols(df, pushcols):
+    """Pushes a list of columns to the front of the DataFrame
+    
+    Args:
+        df (DataFrame): Dataframe to reorder columns
+        pushcols (list): Ordered list of columns to push to front
+    
+    Returns:
+        TYPE: DataFrame
+    """
+    return df[pushcols + subl(df.columns, pushcols)]
