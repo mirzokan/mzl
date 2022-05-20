@@ -6,7 +6,10 @@ import os
 import tempfile
 import glob
 
+import pandas as pd
 import pandas.io.sql as psql
+
+from IPython.display import display, Markdown
 
 import psycopg2
 from configparser import ConfigParser
@@ -99,3 +102,35 @@ def push_cols(df, pushcols):
         TYPE: DataFrame
     """
     return df[pushcols + subl(df.columns, pushcols)]
+
+
+def merge_duplicate_rows(group, delimiter="|"):
+    """Takes a dataframe grouped by an index-like columns that may 
+    contain duplicates. Joins duplicate entries by a pipe
+    
+    Args:
+        group (TYPE): Description
+    
+    Returns:
+        TYPE: Description
+    """
+    if group.shape[0] == 1:
+        return group
+    combined = pd.DataFrame()
+    for col in group.columns:
+        colset = group[col].drop_duplicates()
+        if colset.shape[0] == 1:
+            combined.loc[group.index[0], col] = colset.iloc[0]
+        else:
+            try:
+                colset = [str(x) for x in colset if str(x) 
+                          not in ['', 'nan', '-']]
+                if len(colset) == 1:
+                    combined.loc[group.index[0], col] = colset
+                else:
+                    combined.loc[group.index[0], col] = delimiter.join(colset)
+            except:
+                display(group)
+                return group
+            
+    return combined
