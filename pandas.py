@@ -91,17 +91,22 @@ def xview(df, index=True):
     os.system(com)
 
 
-def push_cols(df, pushcols):
+def push_cols(df, pushcols, back=False):
     """Pushes a list of columns to the front of the DataFrame
     
     Args:
         df (DataFrame): Dataframe to reorder columns
         pushcols (list): Ordered list of columns to push to front
+        back (boolean): Pushes the columns to the back of the list when
+                        set to True
     
     Returns:
         TYPE: DataFrame
     """
-    return df[pushcols + subl(df.columns, pushcols)]
+    if back:
+        return df[subl(df.columns, pushcols) + pushcols]
+    else:
+        return df[pushcols + subl(df.columns, pushcols)]
 
 
 def merge_duplicate_rows(group, delimiter="|"):
@@ -134,3 +139,24 @@ def merge_duplicate_rows(group, delimiter="|"):
                 return group
             
     return combined
+
+
+def concat_columns(df, colname, collist, joinstring="_"):
+    """Simple helper function to concatenate values of multiple
+       columns into one new column.
+    
+    Args:
+        df (TYPE): Dataframe on which to perform the concatenation
+        colname (TYPE): Name of the new column containing the catenations
+        collist (TYPE): List of columns to concatenate
+        joinstring (str, optional): String to use in between the concatenated
+                                    values
+    
+    Returns:
+        Dataframe: Dataframe with the new column of concatenated values
+    """
+    ddf = df[collist].astype(str)
+    df[colname] = ddf.apply(lambda x:
+                            joinstring.join(x),
+                            axis=1)
+    return df
