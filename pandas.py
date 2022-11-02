@@ -155,7 +155,7 @@ def concat_columns(df, colname, collist, joinstring="_"):
     Returns:
         Dataframe: Dataframe with the new column of concatenated values
     """
-    ddf = df[collist].astype(str)
+    ddf = df[collist].copy().astype(str)
     df[colname] = ddf.apply(lambda x:
                             joinstring.join(x),
                             axis=1)
