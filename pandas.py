@@ -5,6 +5,7 @@ Tools for Pandas
 import os
 import tempfile
 import glob
+from datetime import datetime as dt
 
 import pandas as pd
 import pandas.io.sql as psql
@@ -64,7 +65,7 @@ def db_reader(filename='db.ini', section='postgresql'):
     return conn, dr
 
 
-def xview(df, index=True):
+def xview(df, index=True, label=''):
     '''
     Save a Pandas DataFrame as an temporary Excel file and open it, to 
     be used as a lazy data viewer
@@ -81,8 +82,13 @@ def xview(df, index=True):
             os.remove(os.path.abspath(file))
     except:
         pass
+
+    if label != '':
+        prefix = f"mzl_xview_{label}_{dt.now().strftime('%Y-%m-%d_%H-%M')}_"
+    else:
+        prefix = f"mzl_xview_{dt.now().strftime('%Y-%m-%d_%H-%M')}_"
     
-    tf = tempfile.NamedTemporaryFile(prefix="mzl_xview_",
+    tf = tempfile.NamedTemporaryFile(prefix=prefix,
                                      suffix=".xlsx", delete=False)
     df.to_excel(tf, index=index)
     path = os.path.abspath(tf.name) 
@@ -128,8 +134,8 @@ def merge_duplicate_rows(group, delimiter="|"):
             combined.loc[group.index[0], col] = colset.iloc[0]
         else:
             try:
-                colset = [str(x) for x in colset if str(x) 
-                          not in ['', 'nan', '-']]
+                colset = [str(x) for x in colset if str(x).lower() 
+                          not in ['', 'nan', '-', 'n/ap']]
                 if len(colset) == 1:
                     combined.loc[group.index[0], col] = colset
                 else:
