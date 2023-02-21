@@ -141,7 +141,7 @@ def merge_duplicate_rows(group, delimiter="|"):
     return combined
 
 
-def concat_columns(df, colname, collist, joinstring="_"):
+def concat_cols(df, colname, collist, joinstring="_"):
     """Simple helper function to concatenate values of multiple
        columns into one new column.
     
