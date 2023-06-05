@@ -97,6 +97,9 @@ def xview(df, index=True, label=''):
     os.system(com)
 
 
+xv = xview
+
+
 def push_cols(df, pushcols, back=False):
     """Pushes a list of columns to the front of the DataFrame
     
@@ -165,4 +168,16 @@ def concat_cols(df, colname, collist, joinstring="_"):
     df[colname] = ddf.apply(lambda x:
                             joinstring.join(x),
                             axis=1)
+    return df
+
+
+def clean_colnames(df):
+    """Summary
+    
+    Args:
+        df (TYPE): Description
+    """
+    df.columns = df.columns.str.lower().str.replace(r"\s|-", r"_")
+    df.columns = df.columns.str.lower().str.replace(r"\.", r"")
+    df.columns = df.columns.str.lower().str.replace(r"_{2,10}", r"_")
     return df
