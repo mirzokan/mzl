@@ -26,8 +26,7 @@ def read_config(filename='db.ini', section='postgresql'):
     filename: String, path to the configuraiton file
     section: String, name of the .ini file section to read
 
-    Returns:
-    A dictionary of configuration settings
+    Returns: (Dictionary) containing configuration settings
     '''
     parser = ConfigParser()
     parser.read(filename)
@@ -51,10 +50,9 @@ def db_reader(filename='db.ini', section='postgresql'):
     filename: String, path to the configuraiton file
     section: String, name of the .ini file section to read
 
-    Returns:
-    A tuple, first a database connection object, secornd, a function
-    that takes a string SQL query and returns the database response as a
-    pandas DataFrame
+    Returns: (Tuple) first a database connection object, second, a 
+    function that takes a string SQL query and returns the database 
+    response as a pandas DataFrame.
     '''
     db = read_config(filename=filename, section=section)
     conn = psycopg2.connect(**db)
@@ -67,8 +65,8 @@ def db_reader(filename='db.ini', section='postgresql'):
 
 def xview(df, index=True, label=''):
     '''
-    Save a Pandas DataFrame as an temporary Excel file and open it, to 
-    be used as a lazy data viewer
+    Save a Pandas DataFrame as a temporary Excel file and open it, to 
+    be used as a lazy data viewer.
 
     Arguments:
     df: Pandas Dataframe to view
@@ -97,6 +95,7 @@ def xview(df, index=True, label=''):
     os.system(com)
 
 
+# Alias for xview
 xv = xview
 
 
@@ -123,10 +122,10 @@ def merge_duplicate_rows(group, delimiter="|"):
     contain duplicates. Joins duplicate entries by a pipe
     
     Args:
-        group (TYPE): Description
+        group (Pandas Groupby): Description
     
     Returns:
-        TYPE: Description
+        Pandas Groupby: Group with merged duplicates
     """
     if group.shape[0] == 1:
         return group
@@ -172,12 +171,20 @@ def concat_cols(df, colname, collist, joinstring="_"):
 
 
 def clean_colnames(df):
-    """Summary
+    """Cleans up column names in a DataFrame to make it more Pandas
+       friendly. 
     
     Args:
-        df (TYPE): Description
+        df (DataFrame): DataFrame with column names cleaned up
     """
-    df.columns = df.columns.str.lower().str.replace(r"\s|-", r"_")
-    df.columns = df.columns.str.lower().str.replace(r"\.", r"")
-    df.columns = df.columns.str.lower().str.replace(r"_{2,10}", r"_")
+    df.columns = (df.columns.str.lower()
+                  .str.replace(r"\s|-", r"_", regex=True))
+    df.columns = (df.columns.str.lower()
+                  .str.replace(r"\.", r"", regex=True))
+    df.columns = (df.columns.str.lower()
+                  .str.replace(r"[\(|\)|<|>|\?]", r"", regex=True))
+    df.columns = (df.columns.str.lower()
+                  .str.replace(r"_{2,}", r"_", regex=True))
+    df.columns = (df.columns.str.lower()
+                  .str.replace(r"(?:^_+)|(?:_+$)", r"", regex=True))
     return df
