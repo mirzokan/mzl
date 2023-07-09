@@ -4,6 +4,7 @@ Tools for Pandas
 
 import os
 import tempfile
+import time
 import glob
 from datetime import datetime as dt
 
@@ -117,7 +118,7 @@ def push_cols(df, pushcols, back=False):
         return df[pushcols + subl(df.columns, pushcols)]
 
 
-def merge_duplicate_rows(group, delimiter="|"):
+def merge_duplicate_rows(group, delimiter="|", cols=None):
     """Takes a dataframe grouped by an index-like columns that may 
     contain duplicates. Joins duplicate entries by a pipe
     
@@ -127,13 +128,19 @@ def merge_duplicate_rows(group, delimiter="|"):
     Returns:
         Pandas Groupby: Group with merged duplicates
     """
+
     if group.shape[0] == 1:
         return group
-    combined = pd.DataFrame()
-    for col in group.columns:
+    
+    combined = group.iloc[0]
+
+    if cols is None:
+        cols = group.columns
+
+    for col in cols:
         colset = group[col].drop_duplicates()
         if colset.shape[0] == 1:
-            combined.loc[group.index[0], col] = colset.iloc[0]
+            combined.loc[combined.index[0], col] = colset.iloc[0]
         else:
             try:
                 colset = [str(x) for x in colset if str(x).lower() 
