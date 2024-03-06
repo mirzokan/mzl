@@ -118,42 +118,82 @@ def push_cols(df, pushcols, back=False):
         return df[pushcols + subl(df.columns, pushcols)]
 
 
-def merge_duplicate_rows(group, delimiter="|", cols=None):
-    """Takes a dataframe grouped by an index-like columns that may 
-    contain duplicates. Joins duplicate entries by a pipe
-    
-    Args:
-        group (Pandas Groupby): Description
-    
-    Returns:
-        Pandas Groupby: Group with merged duplicates
-    """
+def merge_duplicate_rows(df, groupby, delimiter="|"):
 
-    if group.shape[0] == 1:
-        return group
-    
-    combined = group.iloc[0]
+    def merge_apply(group, groupby, delimiter):
+        if type(groupby) != list:
+            groupby = list(groupby)
 
-    if cols is None:
-        cols = group.columns
+        columns = group.columns
+        columns = subl(columns, groupby)
 
-    for col in cols:
-        colset = group[col].drop_duplicates()
-        if colset.shape[0] == 1:
-            combined.loc[combined.index[0], col] = colset.iloc[0]
-        else:
-            try:
-                colset = [str(x) for x in colset if str(x).lower() 
+        merged_group = group.iloc[0].copy()
+
+        for col in columns:
+            col_values = group[col].drop_duplicates()
+            col_values = [str(x) for x in col_values if str(x).lower() 
                           not in ['', 'nan', '-', 'n/ap']]
-                if len(colset) == 1:
-                    combined.loc[group.index[0], col] = colset
-                else:
-                    combined.loc[group.index[0], col] = delimiter.join(colset)
-            except:
-                display(group)
-                return group
+            col_values = delimiter.join(col_values)
+
+            merged_group[col] = col_values
+
+        return merged_group
+
+    unique = df.loc[~df.duplicated(subset=groupby, keep=False)].copy()
+    duplicated = df.loc[df.duplicated(subset=groupby, keep=False)].copy()
+
+    duplicated = (duplicated.groupby(groupby, 
+                  as_index=False, group_keys=False)
+                  .apply(merge_apply, groupby=groupby,
+                  delimiter=delimiter))
+
+    df = (pd.concat([unique, duplicated]).sort_values(groupby)
+          .reset_index(drop=True))
+
+    return df
+
+# def merge_duplicate_rows(group, delimiter="|", cols=None):
+#     """Takes a dataframe grouped by an index-like columns that may 
+#     contain duplicates. Joins duplicate entries by a pipe
+    
+#     Args:
+#         group (Pandas Groupby): Description
+    
+#     Returns:
+#         Pandas Groupby: Group with merged duplicates
+#     """
+
+#     if group.shape[0] == 1:
+#         return group
+    
+#     merged_set = group.iloc[0]
+
+#     if cols is None:
+#         cols = group.columns
+
+#     for col in cols:
+#         colset = group[col].drop_duplicates()
+#         if colset.shape[0] == 1:
+#             try:
+#                 merged_set.loc[col] = colset.iloc[0]
+#             except:
+#                 print(f"merged_set: {merged_set}")
+#                 print(f"colset: {colset}")
+#                 raise
+#         else:
+#             try:
+#                 colset = [str(x) for x in colset if str(x).lower() 
+#                           not in ['', 'nan', '-', 'n/ap']]
+#                 if len(colset) == 1:
+#                     merged_set.loc[col] = colset
+#                 else:
+#                     merged_set.loc[col] = delimiter.join(colset)
+#             except:
+#                 display(group)
+#                 raise
+#                 # return group
             
-    return combined
+#     return merged_set
 
 
 def concat_cols(df, colname, collist, joinstring="_"):
