@@ -4,7 +4,6 @@ Tools for Pandas
 
 import os
 import tempfile
-import time
 import glob
 from datetime import datetime as dt
 
@@ -101,7 +100,7 @@ xv = xview
 
 
 def push_cols(df, pushcols, back=False):
-    """Pushes a list of columns to the front of the DataFrame
+    """Pushes a list of columns to the front (or back) of a DataFrame
     
     Args:
         df (DataFrame): Dataframe to reorder columns
@@ -110,7 +109,7 @@ def push_cols(df, pushcols, back=False):
                         set to True
     
     Returns:
-        TYPE: DataFrame
+        DataFrame: Dataframe with reordered columns
     """
     if back:
         return df[subl(df.columns, pushcols) + pushcols]
@@ -119,6 +118,20 @@ def push_cols(df, pushcols, back=False):
 
 
 def merge_duplicate_rows(df, groupby, delimiter="|"):
+    """Takes a dataframe and a list of ID columns, then deduplicates
+    the dataframe such that the IDs become unique, while values in 
+    non-ID columns are concatenated.
+
+    Args:
+        df (Dataframe): Dataframe with rows that have duplicate IDs
+        groupby (str or list): Name of a column or list of columns
+                                  to serve as row IDs.
+        delimiter (str): Delimiter string to separate concatenated 
+                         values.
+
+    Returns:
+        Dataframe: Dataframe where row IDs are deduplicated.
+    """
 
     def merge_apply(group, groupby, delimiter):
         if type(groupby) != list:
@@ -151,49 +164,6 @@ def merge_duplicate_rows(df, groupby, delimiter="|"):
           .reset_index(drop=True))
 
     return df
-
-# def merge_duplicate_rows(group, delimiter="|", cols=None):
-#     """Takes a dataframe grouped by an index-like columns that may 
-#     contain duplicates. Joins duplicate entries by a pipe
-    
-#     Args:
-#         group (Pandas Groupby): Description
-    
-#     Returns:
-#         Pandas Groupby: Group with merged duplicates
-#     """
-
-#     if group.shape[0] == 1:
-#         return group
-    
-#     merged_set = group.iloc[0]
-
-#     if cols is None:
-#         cols = group.columns
-
-#     for col in cols:
-#         colset = group[col].drop_duplicates()
-#         if colset.shape[0] == 1:
-#             try:
-#                 merged_set.loc[col] = colset.iloc[0]
-#             except:
-#                 print(f"merged_set: {merged_set}")
-#                 print(f"colset: {colset}")
-#                 raise
-#         else:
-#             try:
-#                 colset = [str(x) for x in colset if str(x).lower() 
-#                           not in ['', 'nan', '-', 'n/ap']]
-#                 if len(colset) == 1:
-#                     merged_set.loc[col] = colset
-#                 else:
-#                     merged_set.loc[col] = delimiter.join(colset)
-#             except:
-#                 display(group)
-#                 raise
-#                 # return group
-            
-#     return merged_set
 
 
 def concat_cols(df, colname, collist, joinstring="_"):
