@@ -5,6 +5,10 @@ General Purpose Tools
 import re
 import os
 import shutil
+import time
+
+class CustomException(Exception):
+    pass
 
 
 def sdir(obj, sunder=False):
@@ -139,3 +143,60 @@ def copy_files(file_list, destination_path, message=False):
             shutil.copy(file_path, new_path)
             if message is not False:
                 print(f"{i}. Copied: {os.path.basename(file_name)}")
+
+
+class execution_timer(object):
+    """docstring for execution_timer"""
+    def __init__(self):
+        self.log = []
+        self.running = False
+        self.loop = {}
+        
+    def _pretty_time(self, time):
+        cutoffs = [0.000000001, 0.000001, 0.001, 1, 60,
+                   60*60, 60*60*24, 60*60*24*365]
+
+        units = {cutoffs[0]: 'ps',
+                 cutoffs[1]: 'ns',
+                 cutoffs[2]: 'µs',
+                 cutoffs[3]: 'ms',
+                 cutoffs[4]: 's',
+                 cutoffs[5]: 'min',
+                 cutoffs[6]: 'h',
+                 cutoffs[7]: 'days',
+                 }
+        
+        for i, cutoff in enumerate(cutoffs):
+            if time < cutoff:
+                time = round(time / cutoffs[i-1], 2)
+                return f"{time} {units[cutoff]}"
+        else:
+            time = round(time / cutoff, 2)
+            return f"{time} years"
+
+
+    def start(self, parameters={}):
+        self.loop = {}
+        self.loop['parameters'] = parameters
+        self.loop['start_time'] = time.time()
+        self.running = True
+
+    def stop(self, display_time=True, return_loop=False):
+        if ('start_time' not in self.loop.keys()) or not self.running:
+            raise CustomException("You need to start a timer, "
+                                  "before you can stop one.")
+        self.loop['stop_time'] = time.time()
+        self.loop['time'] = (self.loop['stop_time'] - self.loop['start_time'])
+        self.loop['pretty_time'] = self._pretty_time(self.loop['time'])
+
+        if display_time:
+            print(f"Execution time: {self.loop['pretty_time']}")
+
+        self.log.append(self.loop)
+        self.running = False
+
+        if return_loop:
+            return self.loop
+
+    def clear(self):
+        self.log = []
