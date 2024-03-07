@@ -6,6 +6,11 @@ import re
 import os
 import shutil
 import time
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import copy
+
 
 class CustomException(Exception):
     pass
@@ -174,7 +179,6 @@ class execution_timer(object):
             time = round(time / cutoff, 2)
             return f"{time} years"
 
-
     def start(self, parameters={}):
         self.loop = {}
         self.loop['parameters'] = parameters
@@ -200,3 +204,33 @@ class execution_timer(object):
 
     def clear(self):
         self.log = []
+
+    def log_df(self):
+        if len(self.log) < 1:
+            return None
+        
+        dflog = copy.deepcopy(self.log)
+
+        for i, line in enumerate(dflog):
+            if type(line['parameters']) == dict:
+                for key in line['parameters'].keys():
+                    if key in dflog[i].keys():
+                        key += "_parameter"
+                    dflog[i][key] = line['parameters'][key]
+
+        df = pd.DataFrame(dflog)
+        df = df.drop('parameters', axis=1)
+        return df
+
+    def plot(self, parameters, log=False):
+        df = self.log_df()
+
+        if type(parameters) != list:
+            parameters = [parameters]
+
+        for parameter in parameters:
+            g = sns.relplot(data=df, x=parameter, y="time", kind='scatter')
+            g.map_dataframe(sns.lineplot, parameter, 'time')
+            if log:
+                g.set(xscale="log")
+                g.set(yscale="log")

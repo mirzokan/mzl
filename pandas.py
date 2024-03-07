@@ -133,17 +133,11 @@ def merge_duplicate_rows(df, groupby, delimiter="|"):
         Dataframe: Dataframe where row IDs are deduplicated.
     """
 
-    def merge_apply(group, groupby, delimiter):
-        if type(groupby) != list:
-            groupby = list(groupby)
-
-        columns = group.columns
-        columns = subl(columns, groupby)
-
+    def merge_apply(group, groupby, delimiter, columns):
         merged_group = group.iloc[0].copy()
 
         for col in columns:
-            col_values = group[col].drop_duplicates()
+            col_values = set(group[col])
             col_values = [str(x) for x in col_values if str(x).lower() 
                           not in ['', 'nan', '-', 'n/ap']]
             col_values = delimiter.join(col_values)
@@ -152,13 +146,19 @@ def merge_duplicate_rows(df, groupby, delimiter="|"):
 
         return merged_group
 
+    if type(groupby) != list:
+        groupby = [groupby]
+
+    columns = df.columns
+    columns = subl(columns, groupby)
+
     unique = df.loc[~df.duplicated(subset=groupby, keep=False)].copy()
     duplicated = df.loc[df.duplicated(subset=groupby, keep=False)].copy()
 
     duplicated = (duplicated.groupby(groupby, 
                   as_index=False, group_keys=False)
                   .apply(merge_apply, groupby=groupby,
-                  delimiter=delimiter))
+                  delimiter=delimiter, columns=columns))
 
     df = (pd.concat([unique, duplicated]).sort_values(groupby)
           .reset_index(drop=True))
