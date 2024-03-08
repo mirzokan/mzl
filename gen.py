@@ -181,7 +181,7 @@ class execution_timer(object):
 
     def start(self, parameters={}):
         self.loop = {}
-        self.loop['parameters'] = parameters
+        self.loop['parameters'] = copy.deepcopy(parameters)
         self.loop['start_time'] = time.time()
         self.running = True
 
