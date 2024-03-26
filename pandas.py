@@ -5,6 +5,7 @@ Tools for Pandas
 import os
 import tempfile
 import glob
+import time
 from datetime import datetime as dt
 
 import pandas as pd
@@ -77,7 +78,9 @@ def xview(df, index=True, label=''):
 
     try:
         for file in oldfiles:
-            os.remove(os.path.abspath(file))
+            time_alive = now = time.time() - os.path.getctime(file)
+            if time_alive > 60:
+                os.remove(os.path.abspath(file))
     except:
         pass
 
