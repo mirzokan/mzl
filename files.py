@@ -3,6 +3,7 @@ Handling Specific File formats
 '''
 
 import pandas as pd
+from .pandas import clean_colnames
 
 
 def read_mad(path):
@@ -19,7 +20,7 @@ def read_mad(path):
     numeric_cols = ['dil_factor', 'mean_final_conc', 'sd', 'cv', 'reported_value',
                     'lloq', 'uloq', 'reportable_range_low', 'reportable_range_high', 'hemoglobin']
     
-    df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
+    # df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='ignore')
     
 #     df['run_timestamp'] = pd.to_datetime(df['run_timestamp'], utc=True)
     
