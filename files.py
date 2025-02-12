@@ -5,6 +5,7 @@ Handling Specific File formats
 import re
 import pandas as pd
 from .pandas import clean_colnames
+from .pandas import xv
 
 
 def read_mad(path):
@@ -24,6 +25,7 @@ def read_mad(path):
                     'lloq', 'uloq', 'reportable_range_low',
                     'reportable_range_high', 'hemoglobin']
     
+    df['limsid'] = df.limsid.str.strip()
     df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='ignore')
     df['result_numeric'] = pd.to_numeric(df.result, errors='coerce')
 
@@ -110,9 +112,17 @@ def read_olink(path, npx=True, delimiter=";"):
 
     if npx:
         df['result'] = df.npx
+    else:
+        df['result'] = df.quantified_value
 
-    numeric_cols = ["maxlod", "platelod", "result", "qc_deviation_inc_ctrl",
-                      "qc_deviation_det_ctrl", "missingfreq"]
+    numeric_cols = ["result", "missingfreq", "platelod", "qc_deviation_inc_ctrl", "qc_deviation_det_ctrl"]
+
+    if npx:
+        numeric_cols = numeric_cols + ['maxlod']
+    else:
+        numeric_cols = numeric_cols + ["platelql", "lloq", "uloq", "unit"]
+
+    numeric_cols = [x for x in numeric_cols if x in df.columns.to_list()]
 
     df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
     df['missingfreq'] = df.missingfreq / 100
@@ -123,6 +133,18 @@ def read_olink(path, npx=True, delimiter=";"):
     df.loc[df.sampleid.str.contains(r"^IPC.*"), "type"] = "ipc"
     df.loc[df.sampleid.str.contains(r"^CS.*"), "type"] = "control"
 
+
+    if npx:
+        if 'maxlod' in df.columns.to_list():
+            df['blq'] = df.result < df.maxlod
+        else:
+            df['blq'] = df.result < df.platelod
+        df['olq'] = df.blq
+    else:
+        df['blq'] = df.result < df.platelql
+        df['alq'] = df.result > df.uloq
+        df['olq'] = (df.blq | df.alq)
+
     return df
 
 
@@ -130,6 +152,8 @@ def read_olink(path, npx=True, delimiter=";"):
 def olink_add_loqs(df, g, uloq=True, lloq=True, log=True, rotate=0, npx=True):
     if npx:
         loqs = df.groupby('assay').agg({'maxlod': 'max'})
+    else:
+        loqs = df.groupby('assay').agg({'platelql': 'max', 'uloq': 'min'})
 
     axes = g.axes.flatten()
     
@@ -148,14 +172,12 @@ def olink_add_loqs(df, g, uloq=True, lloq=True, log=True, rotate=0, npx=True):
                 lloq_level = loqs.loc[re.search(r'=\s(.*)$', ax.get_title()).group(1), 'maxlod']
                 ax.axhline(lloq_level, ls='--', c='black')
     else:
-        pass
-        # if uloq or lloq:
-        #     for i, ax in enumerate(axes):
-        #         if uloq:
-        #             uloq = loqs.loc[re.search(r'=\s(.*)$', ax.get_title()).group(1), 'reportable_range_high']
-        #             ax.axhline(uloq, ls='--', c='black')
+        for i, ax in enumerate(axes):
+            if uloq:
+                uloq_level = loqs.loc[re.search(r'=\s(.*)$', ax.get_title()).group(1), 'uloq']
+                ax.axhline(uloq_level, ls='--', c='black')
 
-        #         if lloq:
-        #             lloq = loqs.loc[re.search(r'=\s(.*)$', ax.get_title()).group(1), 'reportable_range_low']
-        #             ax.axhline(lloq, ls='--', c='black')
+            if lloq:
+                lloq_level = loqs.loc[re.search(r'=\s(.*)$', ax.get_title()).group(1), 'platelql']
+                ax.axhline(lloq_level, ls='--', c='black')
 
