@@ -5,6 +5,7 @@ Handling Specific File formats
 import re
 import pandas as pd
 from .pandas import clean_colnames
+from .pandas import concat_cols
 from .pandas import xv
 
 
@@ -20,6 +21,8 @@ def read_mad(path):
     df = df.rename({'sample': 'limsid', '%cv': 'cv', 
                     'hemoglobin_mg/dl': 'hemoglobin',
                     'reported_value': 'result'}, axis=1)
+
+    df = df.loc[df.result != "Not Analyzed"]
     
     numeric_cols = ['dil_factor', 'mean_final_conc', 'sd', 'cv',
                     'lloq', 'uloq', 'reportable_range_low',
@@ -67,7 +70,8 @@ def mad_add_loqs(df, g, uloq=True, lloq=True, log=True, rotate=0):
                 ax.axhline(lloq_level, ls='--', c='black')
 
 
-def read_lims(path, sheet_name=False):
+def read_lims(path, sheet_name=False, subject_col = 'patient_id',
+              collection = ['subject', 'visit']):
     '''
     Read and pre-process a LIMS file into a pandas Dataframe
 
@@ -81,18 +85,39 @@ def read_lims(path, sheet_name=False):
 
     df = clean_colnames(df)
     rename_cols_dict = {'sample_#': 'limsid', 'project_#': 'project', 
-                        'sample_id': 'barcode', 'patient_id': 'subject',
+                        'sample_id': 'barcode', subject_col: 'subject',
                         'visit_code': 'visit', 
-                        'sample_collection_timestamp': 'colld'}
+                        'sample_collection_timestamp': 'coldt'}
 
     df = df.rename(rename_cols_dict, axis=1)
 
-    date_cols = ['colld', 'received_on:']
+    date_cols = ['coldt', 'received_on:']
     for col in date_cols:
         df[col] = pd.to_datetime(df[col])
 
+    df = concat_cols(df, 'collection', collection)
+
 
     return df
+
+
+def get_visit_order(lims):
+    visit_order = (lims[['subject', 'visit', 'coldt']].drop_duplicates()
+                   .sort_values(['subject', 'coldt']).copy())
+    visit_order = visit_order.drop_duplicates(['subject', 'visit'],
+                                              keep='last')
+
+    visit_order['count'] = visit_order.groupby(['subject']).cumcount()
+
+    visit_order = (visit_order[['visit', 'count']].groupby('visit').mean()
+                   .sort_values("count").round(1)
+                   .rename({"count": 'order'}, axis=1).astype(str))
+    visit_order['order'] = visit_order['order'].str.zfill(5)
+    display(visit_order)
+
+    lims = lims.merge(visit_order, how='left', on='visit')
+    lims['ordered_visit'] = lims.order + "_" + lims.visit
+    return lims
 
 
 
@@ -140,11 +165,11 @@ def read_olink(path, npx=True, delimiter=";"):
             df['blq'] = df.result < df.maxlod
         else:
             df['blq'] = df.result < df.platelod
-        df['olq'] = df.blq
+        df['out_of_range'] = df.blq
     else:
         df['blq'] = df.result < df.platelql
         df['alq'] = df.result > df.uloq
-        df['olq'] = (df.blq | df.alq)
+        df['out_of_range'] = (df.blq | df.alq)
 
     return df
 
