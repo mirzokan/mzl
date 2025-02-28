@@ -109,6 +109,7 @@ def read_olink(path, npx=True, delimiter=";"):
     df = clean_colnames(df)
 
     df['missingfreq'] = df.missingfreq.str.replace('%', '')
+    df['plateid'] = df.plateid.str.upper().str.replace(r'_RUN', '')
 
     if npx:
         df['result'] = df.npx
