@@ -62,11 +62,19 @@ def mad_add_loqs(df, g, uloq=True, lloq=True, log=True, rotate=0):
     if uloq or lloq:
         for i, ax in enumerate(axes):
             if uloq:
-                uloq_level = loqs.loc[re.search(r'=\s(.*)$', ax.get_title()).group(1), 'reportable_range_high']
+                if loqs.shape[0] != 1:
+                    uloq_level = loqs.loc[re.search(r'=\s(.*)$', ax.get_title()).group(1), 'reportable_range_high']
+                else:
+                    uloq_level = loqs.iloc[0]['reportable_range_high']
+
                 ax.axhline(uloq_level, ls='--', c='black')
 
             if lloq:
-                lloq_level = loqs.loc[re.search(r'=\s(.*)$', ax.get_title()).group(1), 'reportable_range_low']
+                if loqs.shape[0] != 1:
+                    lloq_level = loqs.loc[re.search(r'=\s(.*)$', ax.get_title()).group(1), 'reportable_range_low']
+                else:
+                    lloq_level = loqs.iloc[0]['reportable_range_low']
+
                 ax.axhline(lloq_level, ls='--', c='black')
 
 
@@ -122,7 +130,7 @@ def get_visit_order(lims):
 
 
 
-def read_olink(path, npx=True, delimiter=";"):
+def read_olink(path, npx=True, delimiter=","):
     '''
     Read and pre-process an Olink file into a pandas Dataframe
 
