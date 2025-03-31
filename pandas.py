@@ -140,7 +140,7 @@ def merge_duplicate_rows(df, groupby, delimiter="|"):
         merged_group = group.iloc[0].copy()
 
         for col in columns:
-            col_values = set(group[col])
+            col_values = list(dict.fromkeys(group[col]))
             col_values = [str(x) for x in col_values if str(x).lower() 
                           not in ['', 'nan', '-', 'n/ap']]
             col_values = delimiter.join(col_values)
