@@ -3,12 +3,15 @@ Tools for Pandas
 '''
 
 import os
+import re
 import tempfile
 import glob
 import time
 from datetime import datetime as dt
+import string
 
 import pandas as pd
+import numpy as np
 import pandas.io.sql as psql
 
 from IPython.display import display, Markdown
@@ -208,3 +211,80 @@ def clean_colnames(df):
     df.columns = (df.columns.str.lower()
                   .str.replace(r"(?:^_+)|(?:_+$)", r"", regex=True))
     return df
+
+def pretty_colnames(df, renames=None):
+    """Makes column names in a DataFrame more amenable to presentation. 
+    
+    Args:
+        df (DataFrame): DataFrame with column names prettified
+        renames (dictionary): Dictionary with additional renames
+    """
+    def capital_one(key):
+        return re.sub('([a-zA-Z])', lambda x: x.groups()[0].upper(), key, 1)
+
+    sub = df.copy()
+
+    if not renames is None:
+        sub = sub.rename(renames, axis=1)
+
+    sub.columns = sub.columns.str.replace("_", r" ", regex=False)
+    columns_list = sub.columns.to_list()
+
+    columns_list = [capital_one(col) for col in columns_list]
+
+    sub.columns = columns_list
+
+    return sub
+
+
+def view_plate(df, report_column, well='well', run=None,
+               plate=None, export=False):
+
+    sub = df.copy()
+
+    if not ((run is None) and (plate is None)):
+        sub = sub.loc[(sub.run == run) & (sub.plate == plate)]
+
+    if sub[well].str.contains("\|").any():
+        column_order = ['1/2', '3/4', '5/6', '7/8', '9/10', '11/12']
+        sub[['well1', 'well2']] = sub[well].str.split("|", expand=True)
+        sub['row_check'] = sub.well1.str[0] == sub.well2.str[0]
+    
+        if not sub.row_check.all():
+            display(sub)
+            raise VallueError("Replicates are not contained to the same well")
+    
+        sub['rep_row'] = sub.well1.str[0]
+        sub['rep_columns'] = sub.well1.str[1:] + "/" + sub.well2.str[1:]
+
+        test_column_subset = set(sub.rep_columns.drop_duplicates()
+                                 .to_list()).issubset(set(column_order))
+
+        if not test_column_subset:
+            display(sub.rep_columns.drop_duplicates().to_list())
+            raise VallueError("Replicates are not contained to proper columns")
+    else:
+        column_order = ["1", "2", "3", "4", "5", "6", "7",
+         "8", "9", "10", "11", "12"]
+        sub['rep_row'] = sub[well].str[0]
+        sub['rep_columns'] = sub[well].str[1:]
+
+    sub = sub.pivot(columns='rep_columns', index='rep_row',
+                    values=report_column)
+    
+    new_columns = [col for col in column_order 
+                   if col not in sub.columns.to_list()]
+    
+    for col in new_columns:
+        sub[col] = np.NaN
+        
+    sub = sub[column_order]
+    
+    sub.index.name = report_column
+    if not ((run is None) and (plate is None)):
+        sub.columns.name = f'{run}, plate {plate}'
+    
+    if export:
+        xv(sub)
+        
+    return sub
