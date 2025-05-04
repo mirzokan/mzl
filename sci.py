@@ -1,14 +1,12 @@
 '''
-Handling Specific File formats
+Routines associated with handling scientific data
 '''
 
 import re
 import pandas as pd
 import numpy as np
 from IPython.display import display
-from .pandas import clean_colnames
-from .pandas import concat_cols
-from .pandas import xv
+import mzl
 
 ##############################
 # LIMS
@@ -28,7 +26,7 @@ def read_lims(path, sheet_name=False, subject_col='patient_id',
     else:
         df = pd.read_excel(path)
 
-    df = clean_colnames(df)
+    df = df.mzl.clean_colnames()
     rename_cols_dict = {'sample_#': 'limsid', 'project_#': 'project', 
                         'sample_id': 'barcode', subject_col: 'subject',
                         'visit_code': 'visit', 
@@ -40,7 +38,7 @@ def read_lims(path, sheet_name=False, subject_col='patient_id',
     for col in date_cols:
         df[col] = pd.to_datetime(df[col])
 
-    df = concat_cols(df, 'collection', collection)
+    df = df.mzl.concat_cols('collection', collection)
 
     return df
 
@@ -76,7 +74,7 @@ def read_mad(path):
         path: Filepath to the MAD file
     '''
     df = pd.read_csv(path, delimiter='\t', dtype=object)
-    df = clean_colnames(df)
+    df = df.mzl.clean_colnames()
     df = df.rename({'sample': 'limsid', '%cv': 'cv', 
                     'hemoglobin_mg/dl': 'hemoglobin',
                     'reported_value': 'result'}, axis=1)
@@ -157,7 +155,7 @@ def read_olink(path, npx=True, delimiter=","):
     '''
 
     df = pd.read_csv(path, delimiter=delimiter, dtype=object)
-    df = clean_colnames(df)
+    df = df.mzl.clean_colnames()
 
     df['missingfreq'] = df.missingfreq.str.replace('%', '')
     df['plateid'] = df.plateid.str.upper().str.replace(r'_RUN', '')
@@ -284,6 +282,6 @@ def view_plate(df, report_column, well='well', run=None,
         sub.columns.name = f'{run}, plate {plate}'
     
     if export:
-        xv(sub)
+        sub.mzl.xv()
         
     return sub
