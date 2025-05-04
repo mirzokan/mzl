@@ -19,7 +19,7 @@ from IPython.display import display
 
 import psycopg2
 from configparser import ConfigParser
-from .gen import subl
+from mzl import subl
 
 
 def read_config(filename='db.ini', section='postgresql'):
