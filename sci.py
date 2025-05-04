@@ -12,18 +12,18 @@ import mzl
 ##############################
 
 
-def read_lims(path, sheet_name=False, subject_col='patient_id',
-              collection=['subject', 'visit']):
+def read_lims(path, sheet_name=None, subject_col = 'patient_id',
+              collection = ['subject', 'visit']):
     '''
     Read and pre-process a LIMS file into a pandas Dataframe
 
     Args:
         path: Filepath to the LIMS file
     '''
-    if sheet_name:
-        df = pd.read_excel(path, sheet_name='StarLIMS', dtype=object)
+    if sheet_name is not None:
+        df = pd.read_excel(path, sheet_name=sheet_name, dtype=object)
     else:
-        df = pd.read_excel(path)
+        df = pd.read_excel(path, dtype=object)
 
     df = df.mzl.clean_colnames()
     rename_cols_dict = {'sample_#': 'limsid', 'project_#': 'project', 
@@ -98,9 +98,14 @@ def read_mad(path):
     df['result_filled'] = pd.to_numeric(df.result_filled, errors='coerce')
 
     df['run_timestamp'] = df['run_timestamp'].str.replace(
-                          r"(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}) (?:.{1,10})",
-                          r'\1', regex=True)
+                         r"(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}) (?:.{1,10})",
+                         r'\1', regex=True)
+
     df['run_timestamp'] = pd.to_datetime(df['run_timestamp'])
+
+    df['run'] = df.runid.str.split("_", expand=True)[0]
+    df['panel'] = df.runid.str.split("_", expand=True)[1]
+    df['plate'] = df.runid.str.split("_", expand=True)[2]
     
     return df
 
