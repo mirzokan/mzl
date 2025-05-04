@@ -2,17 +2,6 @@
 Tools for working with text data
 '''
 
-import re
-import sys
-import os
-import itertools
-
-import numpy as np
-import pandas as pd
-from matplotlib import pyplot as plt
-
-from nltk.corpus import words
-
 
 def parse_replace(input_string, start_delim="(", end_delim=")",
                   replacement="", level=1, start_alt=None, end_alt=None,
@@ -48,9 +37,10 @@ def parse_replace(input_string, start_delim="(", end_delim=")",
     if start_delim == end_delim:
         raise Exception("Delimeters must be different.")
        
-    if (start_alt is not None and len(start_alt) > len(start_delim)) or \
-       (end_alt is not None and len(end_alt) > len(end_delim)): 
-        raise Exception("Alternative delimiter must not be longer than the delimiter.")
+    if ((start_alt is not None and len(start_alt) > len(start_delim)) or
+       (end_alt is not None and len(end_alt) > len(end_delim))): 
+        raise Exception("Alternative delimiter must not "
+                        "be longer than the delimiter.")
         
     if start_delim not in input_string:
         return input_string
@@ -58,7 +48,6 @@ def parse_replace(input_string, start_delim="(", end_delim=")",
     common_len = 2 if start_delim[0] == end_delim[-1] else 1
     current_level = 0
     chunk_list = []
-    st_len = len(input_string)
     rep_len = len(replacement)
     chunk_start = None
     chunk_end = None
@@ -84,8 +73,9 @@ def parse_replace(input_string, start_delim="(", end_delim=")",
         if strict_eos:
             eos_alt_hit = False
         else:
-            eos_alt_hit = input_string[i:i+len(end_alt)] == end_alt and \
-                        len(input_string[i:].replace(replacement,"")) <= len(end_alt)
+            eos_alt_hit = (input_string[i:i+len(end_alt)] == end_alt and
+                           len(input_string[i:].replace(replacement, ""))
+                           <= len(end_alt))
         
         if end_alt_hit and not (end_del_hit or eos_alt_hit):
             current_level -= 1
@@ -111,9 +101,19 @@ def parse_replace(input_string, start_delim="(", end_delim=")",
 #         print(chunk_list)
     output_string = input_string
     for i, chunk in enumerate(chunk_list):
-        adjusted_start = chunk[0] + ((rep_len)*2 - len(start_delim) - len(end_delim))*i
-        adjusted_end = chunk[1] + ((rep_len)*2 - len(start_delim) - len(end_delim))*i
-        output_string = output_string[:adjusted_start] + replacement + \
-                        output_string[adjusted_start + len(start_delim):adjusted_end] + \
-                        replacement + output_string[adjusted_end + len(end_delim):]
+        adjusted_start = chunk[0] + ((rep_len)*2
+                                     - len(start_delim)
+                                     - len(end_delim))*i
+        adjusted_end = chunk[1] + ((rep_len)*2 
+                                   - len(start_delim)
+                                   - len(end_delim))*i
+        
+        output_string = (output_string[:adjusted_start] 
+                         + replacement 
+                         + output_string[adjusted_start
+                         + len(start_delim):adjusted_end] 
+                         + replacement
+                         + output_string[adjusted_end 
+                         + len(end_delim):])
+
     return output_string
