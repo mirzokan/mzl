@@ -79,7 +79,7 @@ def read_mad(path):
                     'reported_value': 'result'}, axis=1)
 
     df = df.loc[df.result != "Not Analyzed"]
-    
+
     numeric_cols = ['dil_factor', 'mean_final_conc', 'sd', 'cv',
                     'lloq', 'uloq', 'reportable_range_low',
                     'reportable_range_high', 'hemoglobin']
