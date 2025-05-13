@@ -4,6 +4,7 @@ Routines associated with handling scientific data
 
 import re
 import pandas as pd
+import numpy as np
 from IPython.display import display
 import mzl
 
@@ -103,10 +104,22 @@ def read_mad(path):
 
     df['run_timestamp'] = pd.to_datetime(df['run_timestamp'])
 
-    df['run'] = df.runid.str.split("_", expand=True)[0]
-    df['panel'] = df.runid.str.split("_", expand=True)[1]
-    df['plate'] = df.runid.str.split("_", expand=True)[2]
-    
+    try:
+        df['run'] = df.runid.str.split("_", expand=True)[0]
+    except:
+        df['run'] = np.NaN
+
+        
+    try:
+        df['panel'] = df.runid.str.split("_", expand=True)[1]
+    except:
+        df['panel'] = np.NaN
+        
+    try:
+        df['plate'] = df.runid.str.split("_", expand=True)[2]
+    except:
+        df['plate'] = np.NaN
+
     return df
 
 

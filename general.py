@@ -82,7 +82,12 @@ def get_latest_file(path, pattern=None):
     Raises:
         FileNotFoundError: When no matching files are found.
     """
-    files = next(os.walk(path))[2]
+    if not os.path.exists(path):
+        raise CustomException('Specified path not found')
+
+    files = [name for name in os.listdir(path) 
+             if os.path.isfile(os.path.join(path, name))]
+    # files = next(os.walk(path))[2]
     if pattern is not None:
         files = [file for file in files 
                  if re.fullmatch(pattern, file) is not None]
@@ -90,6 +95,8 @@ def get_latest_file(path, pattern=None):
     if len(files) >= 1:
         latest_file = os.path.join(path, files[0])
     else:
+        print(f"path:{path}")
+        print(f"files:{files}")
         raise FileNotFoundError
     return latest_file
 
