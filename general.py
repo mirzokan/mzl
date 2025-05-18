@@ -9,24 +9,22 @@ import time
 import pandas as pd
 import seaborn as sns
 import copy
+from typing import Any, Optional, List, Union
 
 
 class CustomException(Exception):
+    """Custom exception for general-purpose tools."""
     pass
 
 
-def sdir(obj, sunder=False):
-    '''
-    Modification of the dir function to detail special and object
-    specific callables and attributes. Prints out Callables and 
-    Attributes.
+def sdir(obj: Any, sunder: bool = False) -> None:
+    """
+    Enhanced dir function to inspect callable and non-callable attributes.
 
     Args:
-        obj: An object to instpect
-        sunder: Boolean, False shows non-undered attributes,
-                True includes single-under attributes
-    '''
-
+        obj (Any): The object to inspect.
+        sunder (bool): If True, includes single-underscore-prefixed attributes.
+    """
     print(type(obj))
     if sunder:
         unders = [x for x in dir(obj) if re.match("^_(?!_)", x)]
@@ -49,45 +47,42 @@ def sdir(obj, sunder=False):
     print(attribs)
 
 
-def subl(a, b):
+def subl(a: List[Any], b: List[Any]) -> List[Any]:
     """
     Subtract list b from list a.
-    
+
     Args:
-        a (list): List from which to subtract
-        b (list): List which to subtract
-    
+        a (List[Any]): List from which to subtract.
+        b (List[Any]): Elements to subtract from list a.
+
     Returns:
-        list: List that results from the subtraction
+        List[Any]: Resulting list after subtraction.
     """
     return [x for x in a if x not in b]
 
 
-def get_latest_file(path, pattern=None):
+def get_latest_file(path: str, pattern: Optional[str] = None) -> str:
     """
-    From a specific folder, get a list of files, optionally matching a
-    regex pattern, and return the last file in alphabetical order.
-    Useful for getting the latest file from a series that contain
-    timestamps in the filename.
+    Return the most recent timestamped (last alphabetically) file from 
+    a folder.
 
-    
     Args:
-        path (str): Path to the folder to scan.
-        pattern (str, optional): Optional regex pattern to use as
-        a filter
-    
+        path (str): Directory path to scan.
+        pattern (Optional[str]): Optional regex pattern to filter 
+                                 filenames.
+
     Returns:
-        TYPE: str
-    
+        str: Full path to the most recent file.
+
     Raises:
-        FileNotFoundError: When no matching files are found.
+        CustomException: If path does not exist.
+        FileNotFoundError: If no matching file is found.
     """
     if not os.path.exists(path):
         raise CustomException('Specified path not found')
 
     files = [name for name in os.listdir(path) 
              if os.path.isfile(os.path.join(path, name))]
-    # files = next(os.walk(path))[2]
     if pattern is not None:
         files = [file for file in files 
                  if re.fullmatch(pattern, file) is not None]
@@ -101,20 +96,21 @@ def get_latest_file(path, pattern=None):
     return latest_file
 
 
-def list_files_by_ext(path, ext, excluded_subfolder_terms=None):
+def list_files_by_ext(path: str,
+                      ext: str,
+                      excluded_subfolder_terms: Optional[List[str]] = None) -> List[str]:
     """
-    From a specific root folder, get a list of files that have a 
-    specified file extension in the subfolder structure, filtered by 
-    exclusion terms.
-    
+    Recursively list all files with a given extension, excluding folders
+    by keyword.
+
     Args:
-        path (str): Path to the folder to scan.
-        ext (str): File extension to filter for.
-        excluded_subfolder_terms (list): List of terms contained in the 
-                                         folder paths to exclude
-    
+        path (str): Root directory to search.
+        ext (str): File extension filter (e.g., '.csv').
+        excluded_subfolder_terms (Optional[List[str]]): Substrings to exclude
+                                                        folders.
+
     Returns:
-        TYPE: list
+        List[str]: List of matching file paths.
     """
     file_list = []
     
@@ -134,36 +130,54 @@ def list_files_by_ext(path, ext, excluded_subfolder_terms=None):
     return file_list
 
 
-def copy_files(file_list, destination_path, message=False):
-    """Copies a list of paths to a destination directory.
-    Does not overwrite existing files.
-    
+def copy_files(file_list: List[str],
+               destination_path: str,
+               message: bool = False) -> None:
+    """
+    Copy files to a destination directory without overwriting existing ones.
+
     Args:
-        file_list (list): List of paths to copy
-        destination_path (str): Destination path
-        message (str or bool, optional): Whether results are printed,
-                set to "all" to print previously existing files.
+        file_list (List[str]): Paths to files to copy.
+        destination_path (str): Target directory.
+        message (Union[bool, str], optional): If True, prints copied or 
+                                              skipped files.
     """
     for i, file_path in enumerate(file_list):
         file_name = os.path.basename(file_path)
         new_path = os.path.join(destination_path, file_name)
         if os.path.isfile(new_path):
-            if message == "all":
+            if message:
                 print(f"{i}. Exists: {os.path.basename(file_name)}")
         else:
             shutil.copy(file_path, new_path)
-            if message is not False:
+            if message:
                 print(f"{i}. Copied: {os.path.basename(file_name)}")
 
 
 class execution_timer(object):
-    """docstring for execution_timer"""
-    def __init__(self):
-        self.log = []
-        self.running = False
-        self.loop = {}
+    """
+    Utility class for measuring code execution time.
+
+    Attributes:
+        log (List[dict]): List of recorded timing entries.
+        running (bool): Indicates if a timer is currently running.
+        loop (dict): Current loop's timing info.
+    """
+    def __init__(self) -> None:
+        self.log: List[dict] = []
+        self.running: bool = False
+        self.loop: dict = {}
         
-    def _pretty_time(self, time):
+    def _pretty_time(self, time_value: float) -> str:
+        """
+        Convert a raw time value into a human-readable format.
+
+        Args:
+            time_value (float): Time in seconds.
+
+        Returns:
+            str: Formatted time string.
+        """
         cutoffs = [0.000000001, 0.000001, 0.001, 1, 60,
                    60*60, 60*60*24, 60*60*24*365]
 
@@ -185,13 +199,34 @@ class execution_timer(object):
             time = round(time / cutoff, 2)
             return f"{time} years"
 
-    def start(self, parameters={}):
+    def start(self, parameters: dict = {}) -> None:
+        """
+        Start timing.
+
+        Args:
+            parameters (dict): Optional parameters to log with the timing.
+        """
         self.loop = {}
         self.loop['parameters'] = copy.deepcopy(parameters)
         self.loop['start_time'] = time.time()
         self.running = True
 
-    def stop(self, display_time=True, return_loop=False):
+    def stop(self,
+             display_time: bool = True,
+             return_loop: bool = False) -> Optional[dict]:
+        """
+        Stop timing and optionally print or return the result.
+
+        Args:
+            display_time (bool): Print the elapsed time if True.
+            return_loop (bool): Return timing info if True.
+
+        Returns:
+            Optional[dict]: Timing log of current loop if return_loop is True.
+
+        Raises:
+            CustomException: If stop is called without starting.
+        """
         if ('start_time' not in self.loop.keys()) or not self.running:
             raise CustomException("You need to start a timer, "
                                   "before you can stop one.")
@@ -208,10 +243,17 @@ class execution_timer(object):
         if return_loop:
             return self.loop
 
-    def clear(self):
+    def clear(self) -> None:
+        """Clear all stored timing logs."""
         self.log = []
 
-    def log_df(self):
+    def log_df(self) -> Optional[pd.DataFrame]:
+        """
+        Return the timing logs as a pandas DataFrame.
+
+        Returns:
+            Optional[pd.DataFrame]: DataFrame of timing logs, or None if empty.
+        """
         if len(self.log) < 1:
             return None
         
@@ -228,7 +270,15 @@ class execution_timer(object):
         df = df.drop('parameters', axis=1)
         return df
 
-    def plot(self, parameters, log=False):
+    def plot(self, parameters: Union[str, List[str]],
+             log: bool = False) -> None:
+        """
+        Plot execution times against one or more parameters.
+
+        Args:
+            parameters (Union[str, List[str]]): Parameter(s) to plot on x-axis.
+            log (bool): Whether to use log scale.
+        """
         df = self.log_df()
 
         if type(parameters) != list:
@@ -242,36 +292,35 @@ class execution_timer(object):
                 g.set(yscale="log")
 
 
-def parse_replace(input_string, start_delim="(", end_delim=")",
-                  replacement="", level=1, start_alt=None, end_alt=None,
-                  strict_eos=False):
-    '''
-    Parse a string using a set of delimiters and replace said delimiters
-    with something else only at a specified level of nesting. Useful 
-    when processing semi-structured strings.
+def parse_replace(input_string: str,
+                  start_delim: str = "(",
+                  end_delim: str = ")",
+                  replacement: str = "",
+                  level: int = 1,
+                  start_alt: Optional[str] = None,
+                  end_alt: Optional[str] = None,
+                  strict_eos: bool = False) -> str:
+    """
+    Replace delimiters at a specific nesting level in a string.
 
-    Arguments:
-    - input_string: String containing the nested delimiters to process
-    - start_delim: String specifying the start delimiter, defaults to "(" 
-    - end_delim: String specifying the end delimiter, defaults to ")"
-    - replacement: String that replaces both delimiters, defaults to ""
-    - level: Integer specifying the level of nesting at which replacements
-             occur, defaults to 1
-    - start_alt: String specifying an alternative version of the start
-                 delimiter that will trigger a level change
-                 but will not be replaced, must be shorter than the
-                 start delimiter
-    - end_alt: String specifying an alternative version of the end 
-               delimiter that will trigger a level change but will not
-               be replaced, must be shorter than the end delimiter
-    - strict_eos: Boolean, if false will allow replacement of delimiter
-                  set that contains the alternative end delimiter, but
-                  only when it is located at the end of the string or
-                  followed only by the replacement string
+    Args:
+        input_string (str): Text to parse.
+        start_delim (str): Start delimiter (default: "(").
+        end_delim (str): End delimiter (default: ")").
+        replacement (str): Replacement for the delimiters (default: "").
+        level (int): Nesting level at which to replace delimiters.
+        start_alt (Optional[str]): Alternative start delimiter 
+                                   (ignored for replacement).
+        end_alt (Optional[str]): Alternative end delimiter 
+                                 (ignored for replacement).
+        strict_eos (bool): If True, alternative end only applies at string end.
 
     Returns:
-    String where the delimiters are replaced with the replacement
-    '''
+        str: Modified string with delimiters replaced.
+
+    Raises:
+        Exception: On invalid delimiter configuration.
+    """
     
     if start_delim == end_delim:
         raise Exception("Delimeters must be different.")
@@ -293,8 +342,6 @@ def parse_replace(input_string, start_delim="(", end_delim=")",
 
     i = 0
     while i <= len(input_string):
-    #print(f"{i}. {current_level}|{input_string[i:i+len(start_delim)]}|{input_string[i:i+len(start_alt)]}")
-
         start_del_hit = input_string[i:i+len(start_delim)] == start_delim
         start_alt_hit = input_string[i:i+len(start_alt)] == start_alt
         
@@ -336,8 +383,6 @@ def parse_replace(input_string, start_delim="(", end_delim=")",
             i = i + len(end_delim)-common_len
         i += 1
 
-#     if len(chunk_list) > 0:
-#         print(chunk_list)
     output_string = input_string
     for i, chunk in enumerate(chunk_list):
         adjusted_start = chunk[0] + ((rep_len)*2
