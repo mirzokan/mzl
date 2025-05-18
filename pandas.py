@@ -3,6 +3,8 @@ Tools for Pandas
 '''
 
 import os
+import platform
+import subprocess
 import re
 import tempfile
 import glob
@@ -10,24 +12,33 @@ import time
 from datetime import datetime as dt
 
 import pandas as pd
+import numpy as np
 import pandas.io.sql as psql
+
+from IPython.display import display
 
 import psycopg2
 from configparser import ConfigParser
-from .gen import subl
+from mzl import subl
+from typing import Optional, Callable, Tuple, Union, List, Dict
 
 
-def read_config(filename='db.ini', section='postgresql'):
-    '''
-    Reads an .ini configuration file meant to hold database connection
-    configuration
+def read_config(filename: str = 'db.ini',
+                section: str = 'postgresql') -> Dict[str, str]:
+    """
+    Reads database connection parameters from a .ini configuration file.
 
-    Arguments:
-    filename: String, path to the configuraiton file
-    section: String, name of the .ini file section to read
+    Args:
+        filename (str): Path to the configuration file. Defaults to 'db.ini'.
+        section (str): Section name in the .ini file to read. 
+                       Defaults to 'postgresql'.
 
-    Returns: (Dictionary) containing configuration settings
-    '''
+    Returns:
+        Dict[str, str]: Dictionary containing configuration key-value pairs.
+
+    Raises:
+        Exception: If the section is not found in the configuration file.
+    """
     parser = ConfigParser()
     parser.read(filename)
 
@@ -41,19 +52,23 @@ def read_config(filename='db.ini', section='postgresql'):
     return db
 
 
-def db_reader(filename='db.ini', section='postgresql'):
-    '''
-    Creates a database connection object and a function to read SQL 
-    straight into a pandas DataFrame
+def db_reader(filename: str = 'db.ini',
+              section: str = 'postgresql'
+              ) -> Tuple[psycopg2.extensions.connection,
+                         Callable[[str], pd.DataFrame]]:
+    """
+    Creates a PostgreSQL database connection and a reader function.
 
-    Arguments:
-    filename: String, path to the configuraiton file
-    section: String, name of the .ini file section to read
+    Args:
+        filename (str): Path to the configuration file. Defaults to 'db.ini'.
+        section (str): Section name to read connection parameters from. 
+                       Defaults to 'postgresql'.
 
-    Returns: (Tuple) first a database connection object, second, a 
-    function that takes a string SQL query and returns the database 
-    response as a pandas DataFrame.
-    '''
+    Returns:
+        Tuple[psycopg2.extensions.connection, Callable[[str], pd.DataFrame]]: 
+            A connection object and a function to execute SQL queries 
+            into DataFrames.
+    """
     db = read_config(filename=filename, section=section)
     conn = psycopg2.connect(**db)
 
@@ -63,172 +78,252 @@ def db_reader(filename='db.ini', section='postgresql'):
     return conn, dr
 
 
-def xview(df, index=True, label=''):
-    '''
-    Save a Pandas DataFrame as a temporary Excel file and open it, to 
-    be used as a lazy data viewer.
-
-    Arguments:
-    df: Pandas Dataframe to view
-    '''
-    
-    oldfiles = glob.glob(os.path.join(tempfile.gettempdir(),
-                                      "mzl_xview_*"))
-
-    try:
-        for file in oldfiles:
-            time_alive = time.time() - os.path.getctime(file)
-            if time_alive > 60:
-                os.remove(os.path.abspath(file))
-    except:
-        pass
-
-    if label != '':
-        prefix = f"mzl_xview_{label}_{dt.now().strftime('%Y-%m-%d_%H-%M')}_"
-    else:
-        prefix = f"mzl_xview_{dt.now().strftime('%Y-%m-%d_%H-%M')}_"
-    
-    tf = tempfile.NamedTemporaryFile(prefix=prefix,
-                                     suffix=".xlsx", delete=False)
-    df.to_excel(tf, index=index)
-    path = os.path.abspath(tf.name) 
-    com = r"start {}".format(path)
-    tf.close()
-    os.system(com)
-
-
-# Alias for xview
-xv = xview
-
-
-def push_cols(df, pushcols, back=False):
-    """Pushes a list of columns to the front (or back) of a DataFrame
-    
-    Args:
-        df (DataFrame): Dataframe to reorder columns
-        pushcols (list): Ordered list of columns to push to front
-        back (boolean): Pushes the columns to the back of the list when
-                        set to True
-    
-    Returns:
-        DataFrame: Dataframe with reordered columns
+@pd.api.extensions.register_dataframe_accessor("mzl")
+class MzlAccessor:
     """
-    if back:
-        return df[subl(df.columns, pushcols) + pushcols]
-    else:
-        return df[pushcols + subl(df.columns, pushcols)]
-
-
-def merge_duplicate_rows(df, groupby, delimiter="|"):
-    """Takes a dataframe and a list of grouping columns, then deduplicates
-    the dataframe such that the grouping columns become unique, while 
-    values in non-ID columns are concatenated.
-
-    Args:
-        df (Dataframe): Dataframe with rows that have duplicated values
-        groupby (str or list): Name of a column or list of columns
-                                  to serve as unique groupings.
-        delimiter (str): Delimiter string to separate concatenated 
-                         values.
-
-    Returns:
-        Dataframe: Dataframe where groupings are deduplicated.
+    A pandas DataFrame accessor for common preprocessing, formatting, 
+    and exploratory tools. Registered under the `.mzl` namespace.
     """
 
-    def merge_apply(group, groupby, delimiter, columns):
-        merged_group = group.iloc[0].copy()
+    def __init__(self, pandas_obj: pd.DataFrame) -> None:
+        self._obj = pandas_obj
 
-        for col in columns:
-            col_values = list(dict.fromkeys(group[col]))
-            col_values = [str(x) for x in col_values if str(x).lower() 
-                          not in ['', 'nan', '-', 'n/ap']]
-            col_values = delimiter.join(col_values)
+    def xv(self, index: bool = True, label: str = '') -> None:
+        """
+        Save the DataFrame to a temporary Excel file and open it. Used as
+        a lazy data viewer.
 
-            merged_group[col] = col_values
+        Args:
+            index (bool): Whether to include the index in the Excel file.
+                          Defaults to True.
+            label (str): Optional label for naming the temporary file.
+        """
+        oldfiles = glob.glob(os.path.join(tempfile.gettempdir(),
+                                          "mzl_xview_*"))
 
-        return merged_group
+        try:
+            for file in oldfiles:
+                time_alive = time.time() - os.path.getctime(file)
+                if time_alive > 60:
+                    os.remove(os.path.abspath(file))
+        except:
+            pass
 
-    if type(groupby) != list:
-        groupby = [groupby]
+        if label != '':
+            prefix = (f"mzl_xview_{label}_"
+                      f"{dt.now().strftime('%Y-%m-%d_%H-%M')}_")
+        else:
+            prefix = f"mzl_xview_{dt.now().strftime('%Y-%m-%d_%H-%M')}_"
 
-    columns = df.columns
-    columns = subl(columns, groupby)
+        tf = tempfile.NamedTemporaryFile(prefix=prefix, suffix=".xlsx",
+                                         delete=False)
+        self._obj.to_excel(tf, index=index)
+        path = os.path.abspath(tf.name)
+        tf.close()
+        
+        if platform.system() == "Windows":
+            os.startfile(path)
+        elif platform.system() == "Darwin":
+            subprocess.call(["open", path])
+        else:
+            subprocess.call(["xdg-open", path])
 
-    unique = df.loc[~df.duplicated(subset=groupby, keep=False)].copy()
-    duplicated = df.loc[df.duplicated(subset=groupby, keep=False)].copy()
+    def push_cols(self, 
+                  pushcols: List[str],
+                  back: bool = False) -> pd.DataFrame:
+        """
+        Move selected columns to the front or back of the DataFrame.
 
-    duplicated = (duplicated.groupby(groupby, 
-                  as_index=False, group_keys=False)
-                  .apply(merge_apply, groupby=groupby,
-                  delimiter=delimiter, columns=columns))
+        Args:
+            pushcols (List[str]): Columns to reposition.
+            back (bool): If True, push to the end instead of the front.
 
-    df = (pd.concat([unique, duplicated]).sort_values(groupby)
-          .reset_index(drop=True))
+        Returns:
+            pd.DataFrame: Reordered DataFrame.
+        """
+        df = self._obj.copy()
+        if back:
+            return df[subl(df.columns, pushcols) + pushcols]
+        else:
+            return df[pushcols + subl(df.columns, pushcols)]
 
-    return df
+    def merge_duplicate_rows(self, 
+                             groupby: Union[str, List[str]],
+                             delimiter: str = "|") -> pd.DataFrame:
+        """
+        Merge rows with duplicate keys by concatenating other column values.
 
+        Args:
+            groupby (Union[str, List[str]]): Column(s) to group by.
+            delimiter (str): Delimiter used to join values. Defaults to '|'.
 
-def concat_cols(df, colname, collist, joinstring="_"):
-    """Simple helper function to concatenate values of multiple
-       columns into one new column.
-    
-    Args:
-        df (TYPE): Dataframe on which to perform the concatenation
-        colname (TYPE): Name of the new column containing the catenations
-        collist (TYPE): List of columns to concatenate
-        joinstring (str, optional): String to use in between the concatenated
-                                    values
-    
-    Returns:
-        Dataframe: Dataframe with the new column of concatenated values
-    """
-    ddf = df[collist].copy().astype(str)
-    df[colname] = ddf.apply(lambda x:
-                            joinstring.join(x),
-                            axis=1)
-    return df
+        Returns:
+            pd.DataFrame: DataFrame with deduplicated and merged rows.
+        """
+        df = self._obj.copy()
 
+        def merge_apply(group: pd.DataFrame, groupby: List[str],
+                        delimiter: str, columns: List[str]) -> pd.Series:
+            merged_group = group.iloc[0].copy()
+            for col in columns:
+                col_values = list(dict.fromkeys(group[col]))
+                col_values = [str(x) for x in col_values if str(x).lower() 
+                              not in ['', 'nan', '-', 'n/ap']]
+                merged_group[col] = delimiter.join(col_values)
+            return merged_group
 
-def clean_colnames(df):
-    """Cleans up column names in a DataFrame to make it more Pandas
-       friendly. 
-    
-    Args:
-        df (DataFrame): DataFrame with column names cleaned up
-    """
-    df.columns = (df.columns.str.lower()
-                  .str.replace(r"\s|-", r"_", regex=True))
-    df.columns = (df.columns.str.lower()
-                  .str.replace(r"\.", r"", regex=True))
-    df.columns = (df.columns.str.lower()
-                  .str.replace(r"[\(|\)|<|>|\?]", r"", regex=True))
-    df.columns = (df.columns.str.lower()
-                  .str.replace(r"_{2,}", r"_", regex=True))
-    df.columns = (df.columns.str.lower()
-                  .str.replace(r"(?:^_+)|(?:_+$)", r"", regex=True))
-    return df
+        if not isinstance(groupby, list):
+            groupby = [groupby]
 
+        columns = subl(df.columns.tolist(), groupby)
+        unique = df.loc[~df.duplicated(subset=groupby, keep=False)].copy()
+        duplicated = df.loc[df.duplicated(subset=groupby, keep=False)].copy()
 
-def pretty_colnames(df, renames=None):
-    """Makes column names in a DataFrame more amenable to presentation. 
-    
-    Args:
-        df (DataFrame): DataFrame with column names prettified
-        renames (dictionary): Dictionary with additional renames
-    """
-    def capital_one(key):
-        return re.sub('([a-zA-Z])', lambda x: x.groups()[0].upper(), key, 1)
+        duplicated = (duplicated.groupby(groupby, as_index=False,
+                                         group_keys=False)
+                      .apply(merge_apply, 
+                             groupby=groupby,
+                             delimiter=delimiter,
+                             columns=columns))
 
-    sub = df.copy()
+        result = (pd.concat([unique, duplicated])
+                  .sort_values(groupby)
+                  .reset_index(drop=True))
 
-    if renames is not None:
-        sub = sub.rename(renames, axis=1)
+        return result
 
-    sub.columns = sub.columns.str.replace("_", r" ", regex=False)
-    columns_list = sub.columns.to_list()
+    def concat_cols(self, 
+                    colname: str, 
+                    collist: List[str],
+                    joinstring: str = "_") -> pd.DataFrame:
+        """
+        Concatenate multiple columns into a new column.
 
-    columns_list = [capital_one(col) for col in columns_list]
+        Args:
+            colname (str): Name of the new column.
+            collist (List[str]): List of columns to concatenate.
+            joinstring (str): Separator string. Defaults to '_'.
 
-    sub.columns = columns_list
+        Returns:
+            pd.DataFrame: Modified DataFrame with new concatenated column.
+        """
+        df = self._obj.copy()
+        ddf = df[collist].astype(str)
+        df[colname] = ddf.apply(lambda x: joinstring.join(x), axis=1)
+        return df
 
-    return sub
+    def clean_colnames(self) -> pd.DataFrame:
+        """
+        Standardize and clean column names by removing special characters,
+        normalizing case and spacing.
+
+        Returns:
+            pd.DataFrame: DataFrame with cleaned column names.
+        """
+        df = self._obj.copy()
+        df.columns = (df.columns.str.lower()
+                      .str.replace(r"\s|-", "_", regex=True)
+                      .str.replace(r"\.", "", regex=True)
+                      .str.replace(r"[\(\)<>\?]", "", regex=True)
+                      .str.replace(r"_{2,}", "_", regex=True)
+                      .str.replace(r"(^_+|_+$)", "", regex=True))
+        return df
+
+    def pretty_colnames(self, 
+                        renames: Optional[Dict[str, str]] = None
+                        ) -> pd.DataFrame:
+        """
+        Beautify column names for readability and for presentation.
+
+        Args:
+            renames (Optional[Dict[str, str]]): Optional dictionary to 
+                                                rename columns.
+
+        Returns:
+            pd.DataFrame: DataFrame with formatted column names.
+        """
+        def capital_one(key: str) -> str:
+            return re.sub(r'^([a-zA-Z])', lambda x: x.groups()[0].upper(), key)
+
+        df = self._obj.copy()
+        if renames is not None:
+            df = df.rename(columns=renames)
+        df.columns = df.columns.str.replace("_", " ", regex=False)
+        df.columns = [capital_one(col) for col in df.columns]
+        return df
+
+    def view_plate(self,
+                   report_column: str,
+                   well: str = 'well',
+                   run: Optional[str] = None,
+                   plate: Optional[str] = None,
+                   export: bool = False) -> pd.DataFrame:
+        """
+        Generate a plate-format view of well data, optionally filtering 
+        by run/plate.
+
+        Args:
+            report_column (str): Column to use for cell values.
+            well (str): Column that indicates the well identifier. 
+                        Defaults to 'well'.
+            run (Optional[str]): Optional filter for run.
+            plate (Optional[str]): Optional filter for plate.
+            export (bool): If True, exports the view to Excel.
+
+        Returns:
+            pd.DataFrame: Pivoted DataFrame representing plate layout.
+        
+        Raises:
+            ValueError: If replicate wells are invalid or not aligned 
+                        correctly.
+        """
+        sub = self._obj.copy()
+
+        if not ((run is None) and (plate is None)):
+            sub = sub.loc[(sub.run == run) & (sub.plate == plate)]
+
+        if sub[well].str.contains(r"\|").any():
+            column_order = ['1/2', '3/4', '5/6', '7/8', '9/10', '11/12']
+            sub[['well1', 'well2']] = sub[well].str.split("|", expand=True)
+            sub['row_check'] = sub.well1.str[0] == sub.well2.str[0]
+
+            if not sub.row_check.all():
+                display(sub)
+                raise ValueError("Replicates are not contained "
+                                 "to the same well")
+
+            sub['rep_row'] = sub.well1.str[0]
+            sub['rep_columns'] = sub.well1.str[1:] + "/" + sub.well2.str[1:]
+
+            test_column_subset = set(sub.rep_columns.drop_duplicates()
+                                     .to_list()).issubset(set(column_order))
+
+            if not test_column_subset:
+                display(sub.rep_columns.drop_duplicates().to_list())
+                raise ValueError("Replicates are not contained "
+                                 "to the same well")
+        else:
+            column_order = ["1", "2", "3", "4", "5", "6", "7",
+                            "8", "9", "10", "11", "12"]
+            sub['rep_row'] = sub[well].str[0]
+            sub['rep_columns'] = sub[well].str[1:]
+
+        sub = sub.pivot(columns='rep_columns', index='rep_row',
+                        values=report_column)
+
+        new_columns = [col for col in column_order
+                       if col not in sub.columns.to_list()]
+
+        for col in new_columns:
+            sub[col] = np.NaN
+
+        sub = sub[column_order]
+
+        sub.index.name = report_column
+        if not ((run is None) and (plate is None)):
+            sub.columns.name = f'{run}, plate {plate}'
+
+        if export:
+            sub.mzl.xv()
+
+        return sub
