@@ -144,8 +144,7 @@ def read_mad(path: str) -> DataFrame:
         df['run'] = df.runid.str.split("_", expand=True)[0]
     except:
         df['run'] = np.NaN
-
-        
+     
     try:
         df['panel'] = df.runid.str.split("_", expand=True)[1]
     except:
@@ -155,7 +154,6 @@ def read_mad(path: str) -> DataFrame:
         df['plate'] = df.runid.str.split("_", expand=True)[2]
     except:
         df['plate'] = np.NaN
-
 
     return df
 

@@ -20,19 +20,25 @@ from IPython.display import display
 import psycopg2
 from configparser import ConfigParser
 from mzl import subl
+from typing import Optional, Callable, Tuple, Union, List, Dict
 
 
-def read_config(filename='db.ini', section='postgresql'):
-    '''
-    Reads an .ini configuration file meant to hold database connection
-    configuration
+def read_config(filename: str = 'db.ini',
+                section: str = 'postgresql') -> Dict[str, str]:
+    """
+    Reads database connection parameters from a .ini configuration file.
 
-    Arguments:
-    filename: String, path to the configuraiton file
-    section: String, name of the .ini file section to read
+    Args:
+        filename (str): Path to the configuration file. Defaults to 'db.ini'.
+        section (str): Section name in the .ini file to read. 
+                       Defaults to 'postgresql'.
 
-    Returns: (Dictionary) containing configuration settings
-    '''
+    Returns:
+        Dict[str, str]: Dictionary containing configuration key-value pairs.
+
+    Raises:
+        Exception: If the section is not found in the configuration file.
+    """
     parser = ConfigParser()
     parser.read(filename)
 
@@ -46,19 +52,23 @@ def read_config(filename='db.ini', section='postgresql'):
     return db
 
 
-def db_reader(filename='db.ini', section='postgresql'):
-    '''
-    Creates a database connection object and a function to read SQL 
-    straight into a pandas DataFrame
+def db_reader(filename: str = 'db.ini',
+              section: str = 'postgresql'
+              ) -> Tuple[psycopg2.extensions.connection,
+                         Callable[[str], pd.DataFrame]]:
+    """
+    Creates a PostgreSQL database connection and a reader function.
 
-    Arguments:
-    filename: String, path to the configuraiton file
-    section: String, name of the .ini file section to read
+    Args:
+        filename (str): Path to the configuration file. Defaults to 'db.ini'.
+        section (str): Section name to read connection parameters from. 
+                       Defaults to 'postgresql'.
 
-    Returns: (Tuple) first a database connection object, second, a 
-    function that takes a string SQL query and returns the database 
-    response as a pandas DataFrame.
-    '''
+    Returns:
+        Tuple[psycopg2.extensions.connection, Callable[[str], pd.DataFrame]]: 
+            A connection object and a function to execute SQL queries 
+            into DataFrames.
+    """
     db = read_config(filename=filename, section=section)
     conn = psycopg2.connect(**db)
 
@@ -70,15 +80,26 @@ def db_reader(filename='db.ini', section='postgresql'):
 
 @pd.api.extensions.register_dataframe_accessor("mzl")
 class MzlAccessor:
-    def __init__(self, pandas_obj):
+    """
+    A pandas DataFrame accessor for common preprocessing, formatting, 
+    and exploratory tools. Registered under the `.mzl` namespace.
+    """
+
+    def __init__(self, pandas_obj: pd.DataFrame) -> None:
         self._obj = pandas_obj
 
-    def xv(self, index=True, label=''):
+    def xv(self, index: bool = True, label: str = '') -> None:
         """
-        Save a DataFrame as a temporary Excel file and open it.
-        Non-destructive: does not modify the original DataFrame.
+        Save the DataFrame to a temporary Excel file and open it. Used as
+        a lazy data viewer.
+
+        Args:
+            index (bool): Whether to include the index in the Excel file.
+                          Defaults to True.
+            label (str): Optional label for naming the temporary file.
         """
-        oldfiles = glob.glob(os.path.join(tempfile.gettempdir(), "mzl_xview_*"))
+        oldfiles = glob.glob(os.path.join(tempfile.gettempdir(),
+                                          "mzl_xview_*"))
 
         try:
             for file in oldfiles:
@@ -89,7 +110,8 @@ class MzlAccessor:
             pass
 
         if label != '':
-            prefix = f"mzl_xview_{label}_{dt.now().strftime('%Y-%m-%d_%H-%M')}_"
+            prefix = (f"mzl_xview_{label}_"
+                      f"{dt.now().strftime('%Y-%m-%d_%H-%M')}_")
         else:
             prefix = f"mzl_xview_{dt.now().strftime('%Y-%m-%d_%H-%M')}_"
 
@@ -106,10 +128,18 @@ class MzlAccessor:
         else:
             subprocess.call(["xdg-open", path])
 
-    def push_cols(self, pushcols, back=False):
+    def push_cols(self, 
+                  pushcols: List[str],
+                  back: bool = False) -> pd.DataFrame:
         """
-        Reorder columns by pushing selected ones to front or back.
-        Returns a modified copy.
+        Move selected columns to the front or back of the DataFrame.
+
+        Args:
+            pushcols (List[str]): Columns to reposition.
+            back (bool): If True, push to the end instead of the front.
+
+        Returns:
+            pd.DataFrame: Reordered DataFrame.
         """
         df = self._obj.copy()
         if back:
@@ -117,18 +147,28 @@ class MzlAccessor:
         else:
             return df[pushcols + subl(df.columns, pushcols)]
 
-    def merge_duplicate_rows(self, groupby, delimiter="|"):
+    def merge_duplicate_rows(self, 
+                             groupby: Union[str, List[str]],
+                             delimiter: str = "|") -> pd.DataFrame:
         """
-        Deduplicate rows by merging non-groupby column values.
-        Returns a modified copy.
+        Merge rows with duplicate keys by concatenating other column values.
+
+        Args:
+            groupby (Union[str, List[str]]): Column(s) to group by.
+            delimiter (str): Delimiter used to join values. Defaults to '|'.
+
+        Returns:
+            pd.DataFrame: DataFrame with deduplicated and merged rows.
         """
         df = self._obj.copy()
 
-        def merge_apply(group, groupby, delimiter, columns):
+        def merge_apply(group: pd.DataFrame, groupby: List[str],
+                        delimiter: str, columns: List[str]) -> pd.Series:
             merged_group = group.iloc[0].copy()
             for col in columns:
                 col_values = list(dict.fromkeys(group[col]))
-                col_values = [str(x) for x in col_values if str(x).lower() not in ['', 'nan', '-', 'n/ap']]
+                col_values = [str(x) for x in col_values if str(x).lower() 
+                              not in ['', 'nan', '-', 'n/ap']]
                 merged_group[col] = delimiter.join(col_values)
             return merged_group
 
@@ -139,8 +179,12 @@ class MzlAccessor:
         unique = df.loc[~df.duplicated(subset=groupby, keep=False)].copy()
         duplicated = df.loc[df.duplicated(subset=groupby, keep=False)].copy()
 
-        duplicated = (duplicated.groupby(groupby, as_index=False, group_keys=False)
-                      .apply(merge_apply, groupby=groupby, delimiter=delimiter, columns=columns))
+        duplicated = (duplicated.groupby(groupby, as_index=False,
+                                         group_keys=False)
+                      .apply(merge_apply, 
+                             groupby=groupby,
+                             delimiter=delimiter,
+                             columns=columns))
 
         result = (pd.concat([unique, duplicated])
                   .sort_values(groupby)
@@ -148,19 +192,33 @@ class MzlAccessor:
 
         return result
 
-    def concat_cols(self, colname, collist, joinstring="_"):
+    def concat_cols(self, 
+                    colname: str, 
+                    collist: List[str],
+                    joinstring: str = "_") -> pd.DataFrame:
         """
-        Concatenate multiple columns into one new column.
-        Returns a modified copy.
+        Concatenate multiple columns into a new column.
+
+        Args:
+            colname (str): Name of the new column.
+            collist (List[str]): List of columns to concatenate.
+            joinstring (str): Separator string. Defaults to '_'.
+
+        Returns:
+            pd.DataFrame: Modified DataFrame with new concatenated column.
         """
         df = self._obj.copy()
         ddf = df[collist].astype(str)
         df[colname] = ddf.apply(lambda x: joinstring.join(x), axis=1)
         return df
 
-    def clean_colnames(self):
+    def clean_colnames(self) -> pd.DataFrame:
         """
-        Sanitize column names for consistency. Returns a modified copy.
+        Standardize and clean column names by removing special characters,
+        normalizing case and spacing.
+
+        Returns:
+            pd.DataFrame: DataFrame with cleaned column names.
         """
         df = self._obj.copy()
         df.columns = (df.columns.str.lower()
@@ -171,12 +229,20 @@ class MzlAccessor:
                       .str.replace(r"(^_+|_+$)", "", regex=True))
         return df
 
-    def pretty_colnames(self, renames=None):
+    def pretty_colnames(self, 
+                        renames: Optional[Dict[str, str]] = None
+                        ) -> pd.DataFrame:
         """
-        Format column names for display: capitalize and clean underscores.
-        Returns a modified copy.
+        Beautify column names for readability and for presentation.
+
+        Args:
+            renames (Optional[Dict[str, str]]): Optional dictionary to 
+                                                rename columns.
+
+        Returns:
+            pd.DataFrame: DataFrame with formatted column names.
         """
-        def capital_one(key):
+        def capital_one(key: str) -> str:
             return re.sub(r'^([a-zA-Z])', lambda x: x.groups()[0].upper(), key)
 
         df = self._obj.copy()
@@ -186,8 +252,31 @@ class MzlAccessor:
         df.columns = [capital_one(col) for col in df.columns]
         return df
 
-    def view_plate(self, report_column, well='well', run=None,
-                   plate=None, export=False):
+    def view_plate(self,
+                   report_column: str,
+                   well: str = 'well',
+                   run: Optional[str] = None,
+                   plate: Optional[str] = None,
+                   export: bool = False) -> pd.DataFrame:
+        """
+        Generate a plate-format view of well data, optionally filtering 
+        by run/plate.
+
+        Args:
+            report_column (str): Column to use for cell values.
+            well (str): Column that indicates the well identifier. 
+                        Defaults to 'well'.
+            run (Optional[str]): Optional filter for run.
+            plate (Optional[str]): Optional filter for plate.
+            export (bool): If True, exports the view to Excel.
+
+        Returns:
+            pd.DataFrame: Pivoted DataFrame representing plate layout.
+        
+        Raises:
+            ValueError: If replicate wells are invalid or not aligned 
+                        correctly.
+        """
         sub = self._obj.copy()
 
         if not ((run is None) and (plate is None)):
@@ -200,7 +289,8 @@ class MzlAccessor:
 
             if not sub.row_check.all():
                 display(sub)
-                raise ValueError("Replicates are not contained to the same well")
+                raise ValueError("Replicates are not contained "
+                                 "to the same well")
 
             sub['rep_row'] = sub.well1.str[0]
             sub['rep_columns'] = sub.well1.str[1:] + "/" + sub.well2.str[1:]
@@ -210,7 +300,8 @@ class MzlAccessor:
 
             if not test_column_subset:
                 display(sub.rep_columns.drop_duplicates().to_list())
-                raise ValueError("Replicates are not contained to proper columns")
+                raise ValueError("Replicates are not contained "
+                                 "to the same well")
         else:
             column_order = ["1", "2", "3", "4", "5", "6", "7",
                             "8", "9", "10", "11", "12"]
@@ -233,6 +324,6 @@ class MzlAccessor:
             sub.columns.name = f'{run}, plate {plate}'
 
         if export:
-            sub.mzl.xv()  # assumes you have an 'xv' method registered similarly
+            sub.mzl.xv()
 
         return sub
