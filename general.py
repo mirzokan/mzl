@@ -98,7 +98,8 @@ def get_latest_file(path: str, pattern: Optional[str] = None) -> str:
 
 def list_files_by_ext(path: str,
                       ext: str,
-                      excluded_subfolder_terms: Optional[List[str]] = None) -> List[str]:
+                      excluded_subfolder_terms: Optional[List[str]] = None
+                      ) -> List[str]:
     """
     Recursively list all files with a given extension, excluding folders
     by keyword.
@@ -128,6 +129,52 @@ def list_files_by_ext(path: str,
                and ("~" not in filepath)):
                 file_list.append(filepath)
     return file_list
+
+
+def list_files(path: str,
+               include_pattern: Optional[str] = None,
+               exclude_path_pattern: Optional[str] = None,
+               recursive: bool = True
+               ) -> List[str]:
+    """
+    Lists file paths in a given folder, with options to include/exclude 
+    by regex patterns.
+
+    Args:
+        path (str): The path to the folder to search.
+        include_pattern (Optional[str]): A regex pattern to match filenames
+                                         to include.
+        exclude_path_pattern (Optional[str]): A regex pattern to exclude
+                                              directory paths from being
+                                              searched.
+        recursive (bool): If True, search subdirectories recursively;
+                          otherwise, only top-level files.
+
+    Returns:
+        List[str]: A list of file paths that match the given criteria.
+    """
+    matched_files = []
+    include_re = re.compile(include_pattern) if include_pattern else None
+    exclude_path_re = (re.compile(exclude_path_pattern) 
+                       if exclude_path_pattern else None)
+
+    for root, dirs, files in os.walk(path):
+        if exclude_path_re:
+            dirs[:] = [d for d in dirs 
+                       if not exclude_path_re.search(os.path.join(root, d))]
+
+        if not recursive:
+            dirs.clear()
+
+        for file in files:
+            if include_re and not include_re.search(file):
+                continue
+            matched_files.append(os.path.join(root, file))
+
+        if not recursive:
+            break
+
+    return matched_files
 
 
 def copy_files(file_list: List[str],
