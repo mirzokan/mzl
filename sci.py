@@ -3,6 +3,7 @@ Tools for working with scientific/clinical data
 '''
 
 import re
+import os
 import pandas as pd
 import numpy as np
 from IPython.display import display
@@ -320,3 +321,53 @@ def olink_add_loqs(df: DataFrame, g: FacetGrid,
                 lloq_level = loqs.loc[re.search(r'=\s(.*)$',
                                       ax.get_title()).group(1), 'platelql']
                 ax.axhline(lloq_level, ls='--', c='black')
+
+
+##############################
+# ELISA
+##############################
+
+def read_elisa(filepath):
+    df = pd.read_excel(filepath, header=None, usecols="B:M", 
+                       skiprows=10, nrows=24, dtype=str)
+    
+    filename = os.path.basename(filepath)
+
+    run_match = re.search(r'([A-Z]{3}\d{2,5})', filename)
+    run = run_match.group(1) if run_match else None
+
+    plate_match = re.search(r'plate\s*(\d+)', filename, re.IGNORECASE)
+    plate = plate_match.group(1) if plate_match else '1'
+
+    row_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    col_labels = list(range(1, 13))
+
+    records = []
+
+    for i, row_letter in enumerate(row_labels):
+        row_start = i * 3
+        sample_names = df.iloc[row_start]
+        descriptions = df.iloc[row_start + 1]
+        values = df.iloc[row_start + 2]
+
+        for j, col_number in enumerate(col_labels):
+            well = f"{row_letter}{col_number}"
+            sample = sample_names.iloc[j]
+            description = descriptions.iloc[j]
+            value = values.iloc[j]
+
+            records.append({
+                "file": filename,
+                "run": run,
+                "plate": plate,
+                "well": well,
+                "pos": sample,
+                "name": description,
+                "result": value
+            })
+
+    stacked_df = pd.DataFrame(records)
+    
+    stacked_df["result"] = pd.to_numeric(stacked_df["result"],
+                                         errors="coerce")
+    return stacked_df
