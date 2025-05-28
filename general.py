@@ -192,12 +192,12 @@ class execution_timer(object):
                  }
         
         for i, cutoff in enumerate(cutoffs):
-            if time < cutoff:
-                time = round(time / cutoffs[i-1], 2)
-                return f"{time} {units[cutoff]}"
+            if time_value < cutoff:
+                time_value = round(time_value / cutoffs[i-1], 2)
+                return f"{time_value} {units[cutoff]}"
         else:
-            time = round(time / cutoff, 2)
-            return f"{time} years"
+            time_value = round(time_value / cutoff, 2)
+            return f"{time_value} years"
 
     def start(self, parameters: dict = {}) -> None:
         """
