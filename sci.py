@@ -11,7 +11,7 @@ import mzl
 from pandas import DataFrame
 from matplotlib.axes import Axes
 from seaborn.axisgrid import FacetGrid
-from typing import Optional, List
+from typing import Optional, List, Union
 
 
 ##############################
@@ -97,66 +97,75 @@ def add_visit_order(lims: DataFrame,
 # MyAssay
 ##############################
 
-def read_mad(path: str) -> DataFrame:
+def read_mad(paths: Union[str, List[str]]) -> DataFrame:
     """
-    Load and preprocess a MyAssay Desktop (MAD) result file into a 
-    pandas DataFrame.
+    Load and preprocess one or more MyAssay Desktop (MAD) result files 
+    into a single pandas DataFrame.
 
     Args:
-        path (str): File path to the MAD data file.
+        paths (str or list of str): File path(s) to the MAD data file(s).
 
     Returns:
         pd.DataFrame: Cleaned and formatted MAD data including numeric
-        conversion and annotations.
+                      conversion and annotations.
     """
-    df = pd.read_csv(path, delimiter='\t', dtype=object)
-    df = df.mzl.clean_colnames()
-    df = df.rename({
-        'sample': 'limsid', '%cv': 'cv',
-        'hemoglobin_mg/dl': 'hemoglobin',
-        'reported_value': 'result'
-    }, axis=1)
+    if isinstance(paths, str):
+        paths = [paths]  # Normalize to list
 
-    df = df.loc[df.result != "Not Analyzed"]
+    all_dfs = []
 
-    numeric_cols = ['dil_factor', 'mean_final_conc', 'sd', 'cv',
-                    'lloq', 'uloq', 'reportable_range_low',
-                    'reportable_range_high', 'hemoglobin']
+    for path in paths:
+        df = pd.read_csv(path, delimiter='\t', dtype=object)
+        df = df.mzl.clean_colnames()
+        df = df.rename({
+            'sample': 'limsid', '%cv': 'cv',
+            'hemoglobin_mg/dl': 'hemoglobin',
+            'reported_value': 'result'
+        }, axis=1)
 
-    df['limsid'] = df.limsid.str.strip()
-    df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='ignore')
-    df['result_numeric'] = pd.to_numeric(df.result, errors='coerce')
+        df = df.loc[df.result != "Not Analyzed"]
 
-    df['result_filled'] = df.result
-    df['is_filled'] = False
-    df.loc[df.result.isin(['< LLOQ', '> ULOQ', 'Invalid']), 'is_filled'] = True
-    df.loc[df.result.isin(['Invalid', '> ULOQ']),
-           'result_filled'] = df.mean_final_conc
-    df.loc[df.result_filled == "< LLOQ",
-           'result_filled'] = df.reportable_range_low
-    df['result_filled'] = pd.to_numeric(df['result_filled'], errors='coerce')
+        numeric_cols = ['dil_factor', 'mean_final_conc', 'sd', 'cv',
+                        'lloq', 'uloq', 'reportable_range_low',
+                        'reportable_range_high', 'hemoglobin']
 
-    df['run_timestamp'] = df['run_timestamp'].str.replace(
-        r"(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}) (?:.{1,10})",
-        r'\1', regex=True)
-    df['run_timestamp'] = pd.to_datetime(df['run_timestamp'])
+        df['limsid'] = df.limsid.str.strip()
+        df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric,
+                                                  errors='ignore')
+        df['result_numeric'] = pd.to_numeric(df.result, errors='coerce')
 
-    try:
-        df['run'] = df.runid.str.split("_", expand=True)[0]
-    except:
-        df['run'] = np.NaN
-     
-    try:
-        df['panel'] = df.runid.str.split("_", expand=True)[1]
-    except:
-        df['panel'] = np.NaN
-        
-    try:
-        df['plate'] = df.runid.str.split("_", expand=True)[2]
-    except:
-        df['plate'] = np.NaN
+        df['result_filled'] = df.result
+        df['is_filled'] = False
+        df.loc[df.result.isin(['< LLOQ', '> ULOQ', 'Invalid']),
+               'is_filled'] = True
+        df.loc[df.result.isin(['Invalid', '> ULOQ']),
+               'result_filled'] = df.mean_final_conc
+        df.loc[df.result_filled == "< LLOQ",
+               'result_filled'] = df.reportable_range_low
+        df['result_filled'] = pd.to_numeric(df['result_filled'],
+                                            errors='coerce')
 
-    return df
+        df['run_timestamp'] = df['run_timestamp'].str.replace(
+            r"(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}) (?:.{1,10})",
+            r'\1', regex=True)
+        df['run_timestamp'] = pd.to_datetime(df['run_timestamp'])
+
+        try:
+            df['run'] = df.runid.str.split("_", expand=True)[0]
+        except Exception:
+            df['run'] = np.NaN
+        try:
+            df['panel'] = df.runid.str.split("_", expand=True)[1]
+        except Exception:
+            df['panel'] = np.NaN
+        try:
+            df['plate'] = df.runid.str.split("_", expand=True)[2]
+        except Exception:
+            df['plate'] = np.NaN
+
+        all_dfs.append(df)
+
+    return pd.concat(all_dfs, ignore_index=True)
 
 
 def mad_add_loqs(df: DataFrame, g: FacetGrid,
@@ -215,14 +224,15 @@ def mad_add_loqs(df: DataFrame, g: FacetGrid,
 # Olink
 ##############################
 
-def read_olink(path: str,
+def read_olink(paths: Union[str, List[str]],
                npx: bool = True,
                delimiter: str = ",") -> DataFrame:
     """
     Load and process an Olink result CSV file into a pandas DataFrame.
 
     Args:
-        path (str): File path to the Olink CSV export file.
+        paths (str or list of str): File path(s) to the Olink CSV
+                                    export file(s).
         npx (bool): Whether to use NPX values
                     (if False, use quantified values).
         delimiter (str): Delimiter used in the CSV file.
@@ -230,48 +240,59 @@ def read_olink(path: str,
     Returns:
         pd.DataFrame: Standardized Olink assay results.
     """
-    df = pd.read_csv(path, delimiter=delimiter, dtype=object)
-    df = df.mzl.clean_colnames()
+    if isinstance(paths, str):
+        paths = [paths]
 
-    df['missingfreq'] = df.missingfreq.str.replace('%', '')
-    df['plateid'] = df.plateid.str.upper().str.replace(r'_RUN', '')
+    all_dfs = []
 
-    if npx:
-        df['result'] = df.npx
-    else:
-        df['result'] = df.quantified_value
+    for path in paths:
+        df = pd.read_csv(path, delimiter=delimiter, dtype=object)
+        df = df.mzl.clean_colnames()
 
-    numeric_cols = ["result", "missingfreq", "platelod", 
-                    "qc_deviation_inc_ctrl", "qc_deviation_det_ctrl"]
+        df['missingfreq'] = df.missingfreq.str.replace('%', '')
+        df['plateid'] = (df.plateid.str.upper()
+                         .str.replace(r'([A-Z])_RUN(\d{2,4}).*', r'\1\2', 
+                         regex=True))
 
-    if npx:
-        numeric_cols = numeric_cols + ['maxlod']
-    else:
-        numeric_cols = numeric_cols + ["platelql", "lloq", "uloq", "unit"]
-
-    numeric_cols = [x for x in numeric_cols if x in df.columns.to_list()]
-
-    df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
-    df['missingfreq'] = df.missingfreq / 100
-
-    df.loc[:, "type"] = "sample"
-    df.loc[df.sampleid.str.contains(r"^Neg"), "type"] = "negative"
-    df.loc[df.sampleid.str.contains(r"^CA.*"), "type"] = "calibrator"
-    df.loc[df.sampleid.str.contains(r"^IPC.*"), "type"] = "ipc"
-    df.loc[df.sampleid.str.contains(r"^CS.*"), "type"] = "control"
-
-    if npx:
-        if 'maxlod' in df.columns.to_list():
-            df['blq'] = df.result < df.maxlod
+        if npx:
+            df['result'] = df.npx
         else:
-            df['blq'] = df.result < df.platelod
-        df['out_of_range'] = df.blq
-    else:
-        df['blq'] = df.result < df.platelql
-        df['alq'] = df.result > df.uloq
-        df['out_of_range'] = (df.blq | df.alq)
+            df['result'] = df.quantified_value
 
-    return df
+        numeric_cols = ["result", "missingfreq", "platelod", 
+                        "qc_deviation_inc_ctrl", "qc_deviation_det_ctrl"]
+
+        if npx:
+            numeric_cols = numeric_cols + ['maxlod']
+        else:
+            numeric_cols = numeric_cols + ["platelql", "lloq", "uloq", "unit"]
+
+        numeric_cols = [x for x in numeric_cols if x in df.columns.to_list()]
+
+        df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric,
+                                                  errors='coerce')
+        df['missingfreq'] = df.missingfreq / 100
+
+        df.loc[:, "type"] = "sample"
+        df.loc[df.sampleid.str.contains(r"^Neg"), "type"] = "negative"
+        df.loc[df.sampleid.str.contains(r"^CA.*"), "type"] = "calibrator"
+        df.loc[df.sampleid.str.contains(r"^IPC.*"), "type"] = "ipc"
+        df.loc[df.sampleid.str.contains(r"^CS.*"), "type"] = "control"
+
+        if npx:
+            if 'maxlod' in df.columns.to_list():
+                df['blq'] = df.result < df.maxlod
+            else:
+                df['blq'] = df.result < df.platelod
+            df['out_of_range'] = df.blq
+        else:
+            df['blq'] = df.result < df.platelql
+            df['alq'] = df.result > df.uloq
+            df['out_of_range'] = (df.blq | df.alq)
+
+        all_dfs.append(df)
+
+    return pd.concat(all_dfs, ignore_index=True)
 
 
 def olink_add_loqs(df: DataFrame, g: FacetGrid,
