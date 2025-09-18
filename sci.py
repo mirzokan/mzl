@@ -132,6 +132,10 @@ def read_mad(paths: Union[str, List[str]]) -> DataFrame:
         df['limsid'] = df.limsid.str.strip()
         df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric,
                                                   errors='ignore')
+        
+        df['is_reportable'] = True
+        df.loc[df.result.isin(['> ULOQ', 'Invalid']), 'is_reportable'] = False
+
         df['result_numeric'] = pd.to_numeric(df.result, errors='coerce')
 
         df['result_filled'] = df.result
@@ -166,6 +170,45 @@ def read_mad(paths: Union[str, List[str]]) -> DataFrame:
         all_dfs.append(df)
 
     return pd.concat(all_dfs, ignore_index=True)
+
+
+def read_mad_qc(paths: Union[str, List[str]]) -> DataFrame:
+    """
+    Load and preprocess one or more MyAssay Desktop (MAD) QC files 
+    into a single pandas DataFrame.
+
+    Args:
+        paths (str or list of str): File path(s) to the MAD QC data file(s).
+
+    Returns:
+        pd.DataFrame: Cleaned and formatted MAD QC data including numeric
+                      conversion and annotations.
+    """
+    if isinstance(paths, str):
+        paths = [paths]  # Normalize to list
+
+    all_dfs = []
+
+    for path in paths:
+        df = pd.read_csv(path, delimiter='\t', dtype=object)
+        df = df.mzl.clean_colnames()
+
+        df = df.rename({"assayname": "panel", 
+                        "analyte": 'assay',
+                        "runname": "runid",
+                        "rundate": "run_timestamp",
+                        "barcode": "msd_barcode"}, axis=1)
+
+        df['run_timestamp'] = pd.to_datetime(df.run_timestamp, errors='coerce')
+        df['nominalconc'] = pd.to_numeric(df.nominalconc, errors='coerce')
+        df['finalconc'] = pd.to_numeric(df.finalconc, errors='coerce')
+        df['bias'] = pd.to_numeric(df.bias, errors='coerce')
+
+        all_dfs.append(df)
+
+    all_dfs = pd.concat(all_dfs, ignore_index=True)
+    all_dfs = all_dfs.sort_values('run_timestamp')
+    return all_dfs
 
 
 def mad_add_loqs(df: DataFrame, g: FacetGrid,
