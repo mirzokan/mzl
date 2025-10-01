@@ -224,7 +224,7 @@ class MzlAccessor:
         df.columns = (df.columns.str.lower()
                       .str.replace(r"\s|-", "_", regex=True)
                       .str.replace(r"\.", "", regex=True)
-                      .str.replace(r"[\(\)<>\?]", "", regex=True)
+                      .str.replace(r"[\(\)<>\?\*]", "", regex=True)
                       .str.replace(r"_{2,}", "_", regex=True)
                       .str.replace(r"(^_+|_+$)", "", regex=True))
         return df
