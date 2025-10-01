@@ -115,7 +115,11 @@ def read_mad(paths: Union[str, List[str]]) -> DataFrame:
     all_dfs = []
 
     for path in paths:
-        df = pd.read_csv(path, delimiter='\t', dtype=object)
+        try:
+            df = pd.read_csv(path, delimiter='\t', dtype=object)
+        except:
+            print(f"Error in processing the following file: {path}")
+            raise
         df = df.mzl.clean_colnames()
         df = df.rename({
             'sample': 'limsid', '%cv': 'cv',
