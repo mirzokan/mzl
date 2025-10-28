@@ -88,7 +88,7 @@ class MzlAccessor:
     def __init__(self, pandas_obj: pd.DataFrame) -> None:
         self._obj = pandas_obj
 
-    def xv(self, index: bool = True, label: str = '') -> None:
+    def xv(self, index: bool = False, label: str = '') -> None:
         """
         Save the DataFrame to a temporary Excel file and open it. Used as
         a lazy data viewer.
