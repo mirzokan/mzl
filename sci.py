@@ -20,7 +20,7 @@ from typing import Optional, List, Union
 
 def read_lims(path: str,
               sheet_name: Optional[str] = None,
-              subject_col: str = 'patient_id',
+              subject_col: str = 'original_sample_id',
               collection: List[str] = ['subject', 'visit']) -> DataFrame:
     """
     Load and process a LIMS export file into a standardized pandas DataFrame.
