@@ -10,6 +10,9 @@ import tempfile
 import glob
 import time
 from datetime import datetime as dt
+import uuid
+import win32com.client
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
@@ -76,6 +79,85 @@ def db_reader(filename: str = 'db.ini',
         return psql.read_sql(sql, conn)
 
     return conn, dr
+
+
+def read_excel_safe(path, **kwargs):
+
+    def _norm(p: str | Path) -> str:
+        s = str(p).strip().strip('"').strip()
+        return os.path.normcase(os.path.normpath(s))
+
+    def is_workbook_open_in_excel(src_path: str | Path,
+                                  excel_app=None, debug=False):
+        """
+        Returns the Workbook COM object if src_path matches an open
+        workbook in the provided Excel application (or the active Excel
+        instance), else None.
+        """
+        import win32com.client
+
+        src_path = Path(src_path)
+        src_norm = _norm(src_path)
+        src_name = src_path.name.lower()
+
+        if excel_app is None:
+            excel_app = win32com.client.GetActiveObject("Excel.Application")
+
+        candidates = []
+        for wb in excel_app.Workbooks:
+            try:
+                full = wb.FullName
+                name = wb.Name
+            except Exception:
+                continue
+
+            candidates.append((name, full))
+
+            if full and _norm(full) == src_norm:
+                return wb
+
+            if name and name.lower() == src_name:
+                return wb
+
+            if full and full.lower().endswith(src_name):
+                return wb
+
+        if debug:
+            print("[DEBUG] Did not match workbook.")
+            print("  src_path:", str(src_path))
+            print("  src_norm:", src_norm)
+            print("  Open workbooks seen by Excel:")
+            for i, (name, full) in enumerate(candidates, 1):
+                print(f"   {i:2d}. Name={name!r}")
+                print(f"       FullName={full!r}")
+                if full:
+                    print(f"       norm={_norm(full)}")
+            print()
+
+        return None
+
+    path = Path(path)
+
+    # Fast path
+    try:
+        return pd.read_excel(path, **kwargs)
+    except PermissionError:
+        pass
+
+    excel = win32com.client.GetActiveObject("Excel.Application")
+    wb = is_workbook_open_in_excel(path, excel_app=excel, debug=True)
+
+    if wb is None:
+        raise PermissionError(f"File is locked but was not matched to an open workbook:\n{path}")
+
+    tmp_dir = Path(tempfile.gettempdir()) / "excel_readcopies"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    copy_path = tmp_dir / f"{path.stem}_READCOPY_{uuid.uuid4().hex[:8]}.xlsx"
+
+    wb.SaveCopyAs(str(copy_path))
+    time.sleep(0.1)
+
+    return pd.read_excel(copy_path, **kwargs)
 
 
 @pd.api.extensions.register_dataframe_accessor("mzl")

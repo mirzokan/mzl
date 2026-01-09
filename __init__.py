@@ -6,5 +6,9 @@ from .general import (
     execution_timer, parse_replace
 )
 
+from .pandas import (
+    read_excel_safe
+)
+
 from . import sci
 from . import pandas
