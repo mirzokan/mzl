@@ -272,16 +272,13 @@ def mad_add_loqs(df: DataFrame, g: FacetGrid,
 ##############################
 
 def read_olink(paths: Union[str, List[str]],
-               npx: bool = True,
-               delimiter: str = ",") -> DataFrame:
+               delimiter: str = ";") -> DataFrame:
     """
     Load and process an Olink result CSV file into a pandas DataFrame.
 
     Args:
         paths (str or list of str): File path(s) to the Olink CSV
                                     export file(s).
-        npx (bool): Whether to use NPX values
-                    (if False, use quantified values).
         delimiter (str): Delimiter used in the CSV file.
 
     Returns:
@@ -296,44 +293,76 @@ def read_olink(paths: Union[str, List[str]],
         df = pd.read_csv(path, delimiter=delimiter, dtype=object)
         df = df.mzl.clean_colnames()
 
+        if "olink_npx_signature_version" in df.columns:
+            report_software_version = 1
+            df = df.rename({'panel_version': 'panelversion',
+                            'quantified_value': 'quantifiedvalue',
+                            'platelod': 'lodquant',
+                            'platelql': 'lql',
+                            'olink_npx_signature_version': 'softwareversion',
+                            'qc_deviation_inc_ctrl': 'qcdeviationdetctrl',
+                            'qc_deviation_det_ctrl': 'qcdeviationincctrl',
+                            'assay_warning': 'assayqc',
+                            'qc_warning': 'sampleqc'},
+                           axis=1)
+
+            # removed content columns:
+            # Index, QC_WarningPlateLQL, MaxLOD
+
+        else:
+            report_software_version = 2
+            # new content columns:
+            # Product, WellID, SampleType, Ct, LODNPX, BelowLOD, 
+            # BelowLQL, AboveULOQ
+
+            # LQL is LLOQ if plate LOD is lower, or plate LOD otherwise 
+
         df['missingfreq'] = df.missingfreq.str.replace('%', '')
         df['plateid'] = (df.plateid.str.upper()
                          .str.replace(r'([A-Z])_RUN(\d{2,4}).*', r'\1\2', 
                          regex=True))
 
+        npx = not 'quantifiedvalue' in df.columns
+
         if npx:
             df['result'] = df.npx
         else:
-            df['result'] = df.quantified_value
+            df['result'] = df.quantifiedvalue
 
-        numeric_cols = ["result", "missingfreq", "platelod", 
-                        "qc_deviation_inc_ctrl", "qc_deviation_det_ctrl"]
-
-        if npx:
-            numeric_cols = numeric_cols + ['maxlod']
-        else:
-            numeric_cols = numeric_cols + ["platelql", "lloq", "uloq", "unit"]
+        numeric_cols = ["result", "missingfreq", "ct", 'maxlod',
+                        "npx", "lodnpx", "lodquant", "lloq", "lql",
+                        "uloq", "qcdeviationdetctrl", "qcdeviationincctrl"]
 
         numeric_cols = [x for x in numeric_cols if x in df.columns.to_list()]
 
         df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric,
                                                   errors='coerce')
-        df['missingfreq'] = df.missingfreq / 100
 
-        df.loc[:, "type"] = "sample"
-        df.loc[df.sampleid.str.contains(r"^Neg"), "type"] = "negative"
-        df.loc[df.sampleid.str.contains(r"^CA.*"), "type"] = "calibrator"
-        df.loc[df.sampleid.str.contains(r"^IPC.*"), "type"] = "ipc"
-        df.loc[df.sampleid.str.contains(r"^CS.*"), "type"] = "control"
+        boolean_cols = ['belowlod']
+
+        boolean_cols = [x for x in boolean_cols if x in df.columns.to_list()]
+
+        for col in boolean_cols:
+            df[col] = df[col].map({"TRUE": True, 'FALSE': False}).astype(bool)
+
+        if report_software_version == 1:
+            df['missingfreq'] = df.missingfreq / 100
+
+            df.loc[:, "sampletype"] = "SAMPLE"
+            df.loc[df.sampleid.str.contains(r"^Neg"),
+                   "sampletype"] = "NEGATIVE_CONTROL"
+            df.loc[df.sampleid.str.contains(r"^CA.*"),
+                   "sampletype"] = "CALIBRATOR"
+            df.loc[df.sampleid.str.contains(r"^IPC.*"),
+                   "sampletype"] = "IPC"
+            df.loc[df.sampleid.str.contains(r"^CS.*"),
+                   "sampletype"] = "CONTROL"
 
         if npx:
-            if 'maxlod' in df.columns.to_list():
-                df['blq'] = df.result < df.maxlod
-            else:
-                df['blq'] = df.result < df.platelod
+            df['blq'] = df.result < df.lodnpx
             df['out_of_range'] = df.blq
         else:
-            df['blq'] = df.result < df.platelql
+            df['blq'] = df.result < df.lql
             df['alq'] = df.result > df.uloq
             df['out_of_range'] = (df.blq | df.alq)
 
@@ -344,8 +373,7 @@ def read_olink(paths: Union[str, List[str]],
 
 def olink_add_loqs(df: DataFrame, g: FacetGrid,
                    uloq: bool = True, lloq: bool = True,
-                   log: bool = True, rotate: int = 0,
-                   npx: bool = True) -> None:
+                   log: bool = True, rotate: int = 0) -> None:
     """
     Args:
         df (pd.DataFrame): Olink data frame containing assay information.
@@ -354,15 +382,17 @@ def olink_add_loqs(df: DataFrame, g: FacetGrid,
         lloq (bool): Display LLOQ (or LOD for NPX) line.
         log (bool): Use logarithmic scale for y-axis.
         rotate (int): Rotate x-axis labels.
-        npx (bool): Indicates if NPX values are used.
 
     Returns:
         None
     """
+
+    npx = 'quantifiedvalue' in df.columns 
+
     if npx:
         loqs = df.groupby('assay').agg({'maxlod': 'max'})
     else:
-        loqs = df.groupby('assay').agg({'platelql': 'max', 'uloq': 'min'})
+        loqs = df.groupby('assay').agg({'lql': 'max', 'uloq': 'min'})
     axes = g.axes.flatten()
     if rotate != 0:
         g.set_xticklabels(rotation=rotate)
@@ -387,7 +417,7 @@ def olink_add_loqs(df: DataFrame, g: FacetGrid,
 
             if lloq:
                 lloq_level = loqs.loc[re.search(r'=\s(.*)$',
-                                      ax.get_title()).group(1), 'platelql']
+                                      ax.get_title()).group(1), 'lql']
                 ax.axhline(lloq_level, ls='--', c='black')
 
 
